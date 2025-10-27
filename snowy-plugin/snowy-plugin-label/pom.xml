@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>vip.xiaonuo</groupId>
+        <artifactId>snowy-plugin</artifactId>
+        <version>3.0.0</version>
+    </parent>
+
+    <artifactId>snowy-plugin-label</artifactId>
+    <packaging>jar</packaging>
+    <description>标签打印插件</description>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>vip.xiaonuo</groupId>
+            <artifactId>snowy-plugin-label-api</artifactId>
+        </dependency>
+
+        <!-- 引入登录鉴权接口，用于获取当前操作用户 -->
+        <dependency>
+            <groupId>vip.xiaonuo</groupId>
+            <artifactId>snowy-plugin-auth-api</artifactId>
+        </dependency>
+
+        <!-- 引入系统接口，可能用于获取一些基础配置 -->
+        <dependency>
+            <groupId>vip.xiaonuo</groupId>
+            <artifactId>snowy-plugin-sys-api</artifactId>
+        </dependency>
+
+        <!-- 引入开发工具接口，用于配置信息 -->
+        <dependency>
+            <groupId>vip.xiaonuo</groupId>
+            <artifactId>snowy-plugin-dev-api</artifactId>
+        </dependency>
+    </dependencies>
+
+</project>

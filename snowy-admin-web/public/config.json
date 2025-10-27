@@ -1,0 +1,5 @@
+{
+	"baseURL": "http://192.168.1.2:82",
+	"baseURL_production": "http://192.168.1.2:82",
+	"cloudServer": false
+}
