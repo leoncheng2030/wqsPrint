@@ -729,4 +729,13 @@ onMounted(() => {
 :deep(.ant-drawer-header) {
 	border-bottom: 1px solid #f0f0f0;
 }
+:deep(input[type='radio']){
+	    background-color: initial;
+    cursor: default;
+    appearance: auto;
+    box-sizing: border-box;
+    margin: 3px 3px 0px 5px;
+    padding: initial;
+    border: initial;
+}
 </style>

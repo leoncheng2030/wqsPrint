@@ -21,7 +21,7 @@ import { default as echarts } from '@sv-print/plugin-ele-echarts'
 import { default as fabric } from '@sv-print/plugin-ele-fabric'
 import { default as pdfPlugin } from '@sv-print/plugin-api-pdf3'
 import fontSize from './utils/fontSize'
-
+import {default as pluginEleBwip} from "@sv-print/plugin-ele-bwip-js"
 // 将 hiprint 挂载到全局 window 对象
 window.hiprint = hiprint
 // 将Designer和Header组件挂载到全局，以便其他地方使用
@@ -37,14 +37,10 @@ try {
     try {
       const sysBaseConfigSnowy = tool.data.get('SNOWY_SYS_BASE_CONFIG')
       const sysBaseConfigWqs = tool.data.get('WQS_SYS_BASE_CONFIG')
-      console.log('[main] localStorage SNOWY_SYS_BASE_CONFIG:', sysBaseConfigSnowy)
-      console.log('[main] localStorage WQS_SYS_BASE_CONFIG:', sysBaseConfigWqs)
       if (sysBaseConfigSnowy && sysBaseConfigSnowy.SNOWY_SYS_PRINT_HOST) {
         printHost = sysBaseConfigSnowy.SNOWY_SYS_PRINT_HOST
-        console.log('[main] 使用 SNOWY_SYS_BASE_CONFIG.SNOWY_SYS_PRINT_HOST:', printHost)
       } else if (sysBaseConfigWqs && sysBaseConfigWqs.SNOWY_SYS_PRINT_HOST) {
         printHost = sysBaseConfigWqs.SNOWY_SYS_PRINT_HOST
-        console.log('[main] 使用 WQS_SYS_BASE_CONFIG.SNOWY_SYS_PRINT_HOST:', printHost)
       } else {
         printHost = config.SYS_BASE_CONFIG.SNOWY_SYS_PRINT_HOST
         console.log('[main] 使用默认配置 SYS_BASE_CONFIG.SNOWY_SYS_PRINT_HOST:', printHost)
@@ -53,7 +49,7 @@ try {
       console.warn('[main] 获取打印服务器配置失败，使用默认配置:', configError)
       printHost = config.SYS_BASE_CONFIG.SNOWY_SYS_PRINT_HOST
     }
-    
+
     // 在注册前设置 host，确保 hiwebSocket 使用正确的地址
     if (typeof hip.setConfig === 'function' && printHost) {
       try {
@@ -70,7 +66,8 @@ try {
       e2Table({}),
       echarts({}),
       fabric({}),
-      pdfPlugin({})
+      pdfPlugin({}),
+		 pluginEleBwip({})
     ]
     hip.register({
       authKey: config.authKey,
@@ -78,7 +75,7 @@ try {
       // 保持入口处统一设置打印服务器 host
       host: printHost
     })
-    
+
     // 统一设置可选项（如字体大小）
     hip.setConfig({
       optionItems: [

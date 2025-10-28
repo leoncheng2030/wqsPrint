@@ -79,7 +79,6 @@
 		printMulti,
 		printPdf,
 		getStatus: getPrintStatus,
-		refreshPrinterList,
 		generatePreviewHtml
 	} = usePrintOfficial()
 
@@ -131,7 +130,7 @@
 			rendererState.printDataList = printDataList
 			rendererState.totalPages = printDataList.length
 			rendererState.currentPageIndex = 0
-			rendererState.printData = printDataList[0] || {}
+			rendererState.printData = printDataList
 
 			return response
 		} catch (error) {
@@ -146,13 +145,13 @@
 	const generatePreview = async () => {
 		try {
 			if (!templateJSON.value || Object.keys(templateJSON.value).length === 0) {
-				throw new Error('模板数据为空')
+				throw new Error('模板数据无效')
 			}
 
-			const printData = rendererState.printData || {}
-
+			const printData = rendererState.printDataList
 			// 确保打印服务已初始化
 			const status = getPrintStatus()
+
 			if (!status.connected) {
 				const initialized = await initializePrint()
 				if (!initialized) {
@@ -162,61 +161,13 @@
 
 			// 创建模板实例
 			const template = await createTemplate(templateJSON.value)
-			if (!template) {
-				throw new Error('创建模板实例失败')
-			}
-
 			// 生成预览HTML
-			let html = ''
-
-			// 尝试使用模板的 getHtml 方法
-			if (template && typeof template.getHtml === 'function') {
-				const result = template.getHtml(printData)
-
-				// 检查是否是 Promise
-				if (result && typeof result.then === 'function') {
-					try {
-						const resolvedResult = await result
-						html = resolvedResult.html()
-					} catch (promiseError) {
-						html = await generatePreviewHtml(templateJSON.value, printData)
-					}
-				}
-			} else {
-				// 降级方案：使用 generatePreviewHtml
-				html = await generatePreviewHtml(templateJSON.value, printData)
-			}
-
-			// 确保 html 是字符串
-			if (typeof html !== 'string') {
-				html = String(html || '')
-			}
+			let html = await generatePreviewHtml(template, printData)
 			// 删除旋转样式标签(transform和transform-origin的值可能是任意数值)
 			html = html.replace(/<style expandcss="">\.hiprint-printPaper\{\s*transform:\s*rotate\([^)]+\);\s*transform-origin:\s*[\d.]+mm\s+[\d.]+mm;\s*}<\/style>/g, '')
-
-
-			if (html.trim()) {
-				rendererState.htmlContent = html
-			} else {
-				rendererState.htmlContent = `
-					<div style="padding: 40px; text-align: center; border: 2px dashed #ffa500; color: #ffa500; background: #fff7e6;">
-						<h3>预览生成警告</h3>
-						<p>生成的HTML内容为空，请检查模板配置和数据</p>
-					</div>
-				`
-			}
+			rendererState.htmlContent = html
 		} catch (error) {
-			rendererState.htmlContent = `
-				<div style="padding: 40px; text-align: center; background: white; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-					<div style="color: #ff4d4f; font-size: 16px; margin-bottom: 12px;">
-						<i class="anticon anticon-warning-circle"></i>
-						预览生成失败
-					</div>
-					<div style="color: #666; font-size: 14px; margin-bottom: 12px;">
-						${error.message || '无法生成预览HTML'}
-					</div>
-				</div>
-			`
+			message.error('生成预览HTML失败: ' + error.message)
 		}
 	}
 
@@ -301,7 +252,6 @@
 		}
 
 		try {
-			printing.value = true
 			// 检查打印服务状态
 			const status = getPrintStatus()
 			if (!status.connected) {
@@ -317,21 +267,26 @@
 				await getTemplateData()
 			}
 			await createTemplate(templateJSON.value)
-
 			// 执行打印
 			if (totalPages.value > 1) {
-				await printMulti(printDataList.value, {
+				const promise = await printMulti(printDataList.value, {
 					printer: selectedPrinter,
 					title: currentRecord.value.businessKey || '打印任务',
-				})
+				});
+				if (promise.success){
+					message.success('打印成功')
+				}
 			} else {
 				// 单页打印
-				await printHtml(JSON.parse(currentRecord.value.printData), {
+				const promise = await printHtml(JSON.parse(currentRecord.value.printData), {
 					printer: selectedPrinter,
 					title: currentRecord.value.businessKey || '打印任务',
-				})
+				});
+				if (promise.success){
+					message.success('打印成功')
+				}
 			}
-
+			printing.value = false
 			printerModalVisible.value = false
 		} catch (error) {
 			message.error('打印失败: ' + error.message)

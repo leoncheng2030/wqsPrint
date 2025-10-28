@@ -1,43 +1,8 @@
 <template>
 	<div class="preview-content" ref="previewContentRef" @scroll="handleScroll">
 		<a-spin :spinning="loading" tip="加载预览中...">
-			<!-- 连续滚动模式 - 显示所有页面 -->
-			<div v-if="htmlContent && totalPages > 1" class="continuous-preview-wrapper">
-				<div
-					v-for="(pageData, index) in printDataList"
-					:key="`page-${index}`"
-					:id="`preview-page-${index + 1}`"
-					class="page-content-wrapper"
-				>
-					<div v-html="getPageHtml(index)"></div>
-					<!-- 重新生成按钮 -->
-					<div v-if="isPageError(index)" class="page-error-actions">
-						<a-button 
-							type="primary" 
-							size="small" 
-							@click="handleRegeneratePage(index)"
-							:loading="regeneratingPages.has(index)"
-						>
-							重新生成第{{ index + 1 }}页
-						</a-button>
-					</div>
-				</div>
-			</div>
-
-			<!-- 单页模式 -->
-			<div v-else-if="htmlContent" class="preview-wrapper">
+			<div v-if="htmlContent" class="preview-wrapper">
 				<div v-html="htmlContent"></div>
-				<!-- 重新生成按钮 -->
-				<div v-if="isPageError(0)" class="page-error-actions">
-					<a-button 
-						type="primary" 
-						size="small" 
-						@click="handleRegeneratePage(0)"
-						:loading="regeneratingPages.has(0)"
-					>
-						重新生成
-					</a-button>
-				</div>
 			</div>
 
 			<!-- 空状态 -->
@@ -157,7 +122,7 @@
 		}
 
 		:deep(.hiprint-printPaper) {
-			margin: 0 !important;
+			margin: 10px !important;
 			background: white;
 			border: 1px solid #e0e0e0;
 			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);

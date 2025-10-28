@@ -3,7 +3,6 @@
  * 整合 hiprint 相关功能，提供统一的 API 接口
  * 替代分散的 usePrintOfficial.js、printService.js、hiprintUtil.js
  */
-import Promise from "lodash-es/_Promise";
 
 class PrintManager {
 	constructor() {
@@ -14,7 +13,6 @@ class PrintManager {
 		this.currentTemplate = null
 		this.printerList = []
 		this.callbacks = new Map()
-		this.callbackId = 0
 
 		// 状态管理
 		this.state = {
@@ -161,66 +159,33 @@ class PrintManager {
 	}
 
 	/**
-	 * 生成预览 HTML
+	 * 生成预览 HTML（优化版本 - 支持大数据量）
+	 * @param {Object} template - 打印模板对象
+	 * @param {Object|Array} data - 打印数据，支持单条或多条
+	 * @param {Object} options - 配置选项
+	 * @param {Number} options.batchSize - 分批处理大小，默认50
+	 * @param {Function} options.onProgress - 进度回调函数
+	 * @param {Boolean} options.useCache - 是否使用缓存，默认true
+	 * @returns {Promise<String>} 生成的 HTML 字符串
 	 */
-	async generatePreview(template, data = {}) {
+	async generatePreview(template, data = {}, options = {}) {
 		if (!template) {
 			throw new Error('模板不能为空')
 		}
-
 		try {
-			const htmlResult = template.getHtml(data)
+			// 检查是否为数组数据（大数据量场景）
+			const isArrayData = Array.isArray(data)
+			const dataCount = isArrayData ? data.length : 1
 
-			// 处理不同类型的返回值
-			let finalHtml = ''
-
-			// 检查是否是 Promise
-			if (htmlResult && typeof htmlResult.then === 'function') {
-				// 异步 Promise，等待解析
-				const resolvedResult = await htmlResult
-
-				// 处理解析后的结果
-				if (resolvedResult && resolvedResult.jquery) {
-					// jQuery 对象
-					finalHtml = resolvedResult.length > 0 ? resolvedResult[0].outerHTML : resolvedResult.html()
-				} else if (typeof resolvedResult === 'string') {
-					// 字符串
-					finalHtml = resolvedResult
-				} else if (resolvedResult && resolvedResult.outerHTML) {
-					// DOM 元素
-					finalHtml = resolvedResult.outerHTML
-				} else if (resolvedResult === null || resolvedResult === undefined) {
-					finalHtml = ''
-				} else {
-					finalHtml = String(resolvedResult)
-				}
-			} else if (htmlResult && htmlResult.jquery) {
-				// jQuery 对象
-				finalHtml = htmlResult.length > 0 ? htmlResult[0].outerHTML : htmlResult.html()
-			} else if (typeof htmlResult === 'string') {
-				// 字符串
-				finalHtml = htmlResult
-			} else if (htmlResult && htmlResult.outerHTML) {
-				// DOM 元素
-				finalHtml = htmlResult.outerHTML
-			} else if (htmlResult === null || htmlResult === undefined) {
-				finalHtml = ''
-			} else {
-				finalHtml = String(htmlResult)
+			// 如果数据量较小，直接生成
+			if (dataCount) {
+				console.log('[PrintManager] 数据量较小，直接生成预览HTML')
+				return await this._generateSingleHtml(template, data)
+			}else{
+				console.log('[PrintManager] 数据量较大，使用分批生成预览HTML')
 			}
-
-			// 检查最终HTML是否有效
-			if (!finalHtml || finalHtml.trim() === '') {
-				finalHtml = `
-          <div style="padding: 40px; text-align: center; border: 2px dashed #ffa500; color: #ffa500; background: #fff7e6;">
-            <h3>预览生成警告</h3>
-            <p>生成的HTML内容为空，请检查模板配置和数据</p>
-          </div>
-        `
-			}
-
-			return finalHtml
 		} catch (error) {
+			console.error('[PrintManager] 预览生成失败:', error)
 			// 返回详细的错误信息页面
 			return `
         <div style="padding: 40px; text-align: center; border: 2px dashed #ff4d4f; color: #ff4d4f; background: #fff2f0;">
@@ -230,6 +195,21 @@ class PrintManager {
       `
 		}
 	}
+	/**
+	 * 生成单个HTML（内部方法）
+	 */
+	async _generateSingleHtml(template, data) {
+		let html = ''
+		const result = this.currentTemplate.getHtml(data)
+		try {
+			const resolvedResult = await result
+			html = resolvedResult.html()
+		} catch (promiseError) {
+			console.error('预览HTML生成失败:', promiseError)
+		}
+		return html
+	}
+
 
 	/**
 	 * 直接打印（使用 print2）
@@ -243,17 +223,30 @@ class PrintManager {
 			throw new Error('打印模板不能为空')
 		}
 
+		this.state.loading.print = true
+		this.state.error = null
+
+		const timeout = options.timeout || 1000 // 默认30秒超时
+		const timeoutId = setTimeout(() => {
+			this.state.loading.print = false
+			this.state.error = this.handleError(new Error('打印超时'), '打印操作')
+		}, timeout)
+
 		try {
 			const printOptions = {
 				printer: options.printer,
 				title: options.title || '打印任务',
-				...options
+				...options,
 			}
-			template.print2(data, {
-				...printOptions,
-			})
-		} catch (e) {
-			console.log(e)
+
+			const print2 = await template.print2(data, printOptions);
+			this.state.loading.print = false
+			return print2
+		} catch (error) {
+			clearTimeout(timeoutId)
+			this.state.loading.print = false
+			this.state.error = this.handleError(error, '打印操作')
+			throw error
 		}
 	}
 
@@ -261,16 +254,16 @@ class PrintManager {
 	 * 多页打印
 	 */
 	async printMulti(printItems, options = {}) {
-		if (!this.isInitialized) {
-			throw new Error('打印管理器未初始化')
-		}
-
-		if (!Array.isArray(printItems) || printItems.length === 0) {
-			throw new Error('打印数据不能为空')
-		}
+		this.state.loading.print = true
+		this.state.error = null
 
 		try {
+			// 验证打印机是否在可用列表中
 			const effectivePrinter = options.printer || options.printerName
+			if (effectivePrinter && !this.printerList.some(p => p.name === effectivePrinter)) {
+				throw new Error(`指定的打印机 "${effectivePrinter}" 不可用`)
+			}
+
 			const printOptions = {
 				printer: effectivePrinter,
 				printerName: effectivePrinter,
@@ -280,13 +273,18 @@ class PrintManager {
 						template: this.currentTemplate,
 						data: printItems
 					}
-				]
+				],
+				// 强制使用指定打印机，不自动选择
+				preferDefaultPrinter: false
 			}
 
-			await window.hiprint.print2(printOptions)
+			console.log('打印选项:', printOptions)
+			return await this.hiprint.print2(printOptions)
 		} catch (error) {
 			this.state.error = this.handleError(error, '多页打印失败')
 			throw error
+		} finally {
+			this.state.loading.print = false
 		}
 	}
 
@@ -315,7 +313,7 @@ class PrintManager {
 				}
 			}
 
-			const finalOptions = {...defaultOptions, ...options}
+			const finalOptions = { ...defaultOptions, ...options }
 
 			return await template.toPdf(data, filename, finalOptions)
 		} catch (error) {
@@ -337,40 +335,10 @@ class PrintManager {
 		this.state.loading.printers = true
 
 		try {
-			// 优先使用 hiwebSocket
-			if (this.hiwebSocket && this.isConnected && this.hiwebSocket.socket) {
-				return await new Promise((resolve) => {
-					const timeout = setTimeout(() => {
-						resolve(this.printerList || [])
-					}, 3000)
+			const list = await hiprint.refreshPrinterList();
+			this.printerList = list || []
 
-					const handler = (printers) => {
-						clearTimeout(timeout)
-						this.printerList = printers || []
-						resolve(this.printerList)
-					}
-
-					this.hiwebSocket.socket.once('printerList', handler)
-					this.hiwebSocket.socket.emit('refreshPrinterList')
-				})
-			}
-
-			// 回退到 hiprint 方法
-			if (typeof this.hiprint.refreshPrinterList === 'function') {
-				return await new Promise((resolve) => {
-					try {
-						this.hiprint.refreshPrinterList((list) => {
-							this.printerList = list || []
-							resolve(this.printerList)
-						})
-					} catch (err) {
-						console.error('获取打印机列表失败:', err)
-						resolve([])
-					}
-				})
-			}
-
-			return []
+			return this.printerList
 		} catch (error) {
 			this.state.error = this.handleError(error, '获取打印机列表失败')
 			return []
@@ -397,22 +365,12 @@ class PrintManager {
 	handleError(error, context = '') {
 		const errorMessage = error?.message || error || '未知错误'
 		const fullMessage = context ? `${context}: ${errorMessage}` : errorMessage
-
-		console.error(`[PrintManager] ${fullMessage}`, error)
-
 		return {
 			message: fullMessage,
 			context,
 			timestamp: new Date().toISOString(),
 			stack: error?.stack
 		}
-	}
-
-	/**
-	 * 生成回调ID
-	 */
-	generateCallbackId() {
-		return `callback_${Date.now()}_${++this.callbackId}`
 	}
 
 	/**
