@@ -314,7 +314,7 @@ class PrintManager {
 			}
 
 			const finalOptions = { ...defaultOptions, ...options }
-
+			console.log('PDF导出选项:', data)
 			return await template.toPdf(data, filename, finalOptions)
 		} catch (error) {
 			this.state.error = this.handleError(error, 'PDF导出失败')
