@@ -237,93 +237,78 @@
 					<div class="section-title">二维码配置</div>
 				</div>
 
+				<!-- 基础配置：格式 + 分隔符 + 标识符 合为一行 -->
 				<a-row :gutter="16">
-					<a-col :span="12">
-						<a-form-item label="二维码格式" name="formatType" :label-col="{ span: 6 }">
+					<a-col :span="6">
+						<a-form-item label="格式" name="formatType" :label-col="{ span: 8 }">
 							<a-select
 								v-model:value="formData.qrCodeConfig.formatType"
-								placeholder="请选择二维码格式类型"
 								@change="onFormatTypeChange"
 							>
-								<a-select-option value="json">JSON格式</a-select-option>
-								<a-select-option value="custom">自定义分隔符</a-select-option>
+								<a-select-option value="json">JSON</a-select-option>
+								<a-select-option value="custom">分隔符</a-select-option>
 							</a-select>
 						</a-form-item>
 					</a-col>
-					<a-col :span="12">
-						<a-form-item v-if="formData.qrCodeConfig.formatType === 'json'" label="数据类型" name="jsonDataType" :label-col="{ span: 6 }">
-							<a-select
-								v-model:value="formData.qrCodeConfig.jsonDataType"
-								placeholder="请选择JSON数据类型"
+					<a-col :span="6">
+						<template v-if="formData.qrCodeConfig.formatType === 'json'">
+							<a-form-item label="类型" name="jsonDataType" :label-col="{ span: 8 }">
+								<a-select
+									v-model:value="formData.qrCodeConfig.jsonDataType"
+									@change="updateQrContent"
+								>
+									<a-select-option value="object">对象</a-select-option>
+									<a-select-option value="array">数组</a-select-option>
+								</a-select>
+							</a-form-item>
+						</template>
+						<template v-else>
+							<a-form-item label="分隔符" name="separator" :label-col="{ span: 8 }">
+								<a-input
+									v-model:value="formData.qrCodeConfig.separator"
+									placeholder="如：| 或 ,"
+									@change="updateQrContent"
+									allow-clear
+								/>
+							</a-form-item>
+						</template>
+					</a-col>
+					<a-col :span="6">
+						<a-form-item label="开始" name="startMarker" :label-col="{ span: 8 }">
+							<a-input
+								v-model:value="formData.qrCodeConfig.startMarker"
+								placeholder="如：[)>"
 								@change="updateQrContent"
-							>
-								<a-select-option value="object">对象类型</a-select-option>
-								<a-select-option value="array">数组类型</a-select-option>
-							</a-select>
+								allow-clear
+							/>
+						</a-form-item>
+					</a-col>
+					<a-col :span="6">
+						<a-form-item label="结束" name="endMarker" :label-col="{ span: 8 }">
+							<a-input
+								v-model:value="formData.qrCodeConfig.endMarker"
+								placeholder="如：EOT"
+								@change="updateQrContent"
+								allow-clear
+							/>
 						</a-form-item>
 					</a-col>
 				</a-row>
 
 				<a-row :gutter="16">
-					<a-col :span="12" v-if="formData.qrCodeConfig.formatType === 'custom'">
-						<a-form-item  label="分隔符配置" name="separator" :label-col="{ span: 6 }">
+					<a-col :span="6">
+						<a-form-item label="格式标识" name="formatId" :label-col="{ span: 8 }">
 							<a-input
-								v-model:value="formData.qrCodeConfig.separator"
-								placeholder="请输入分隔符，如：| 或 , 或 ; 等"
+								v-model:value="formData.qrCodeConfig.formatId"
+								placeholder="如：21"
 								@change="updateQrContent"
 								allow-clear
 							/>
 						</a-form-item>
 					</a-col>
-					<a-col :span="12">
-						<a-form-item label="明细值分隔符" name="itemValueSeparator" :label-col="{ span: 6 }">
-							<a-input
-								v-model:value="formData.qrCodeConfig.itemValueSeparator"
-								placeholder="请输入明细字段值分隔符，如：, 或 ; 或 | 等"
-								@change="updateQrContent"
-								allow-clear
-							/>
-						</a-form-item>
-					</a-col>
-					<a-col :span="12">
-						<a-form-item label="明细行分隔符" name="detailRowSeparator" :label-col="{ span: 6 }">
-							<a-input
-								v-model:value="formData.qrCodeConfig.detailRowSeparator"
-								placeholder="请输入明细行分隔符，如：# 或 @ 或 $ 等"
-								@change="updateQrContent"
-								allow-clear
-							/>
-						</a-form-item>
-					</a-col>
-					
-					<a-col :span="12">
-						<a-form-item label="开始标识符" name="startMarker" :label-col="{ span: 6 }">
-							<a-input
-								v-model:value="formData.qrCodeConfig.startMarker"
-								placeholder="请输入开始标识符，如：START 或 ## 或 BOM 等"
-								@change="updateQrContent"
-								allow-clear
-							/>
-							<div class="ant-form-item-explain">
-								<small>添加在二维码内容最前的开始标识符，可选配置</small>
-							</div>
-						</a-form-item>
-					</a-col>
-					<a-col :span="12">
-						<a-form-item label="结束标识符" name="endMarker" :label-col="{ span: 6 }">
-							<a-input
-								v-model:value="formData.qrCodeConfig.endMarker"
-								placeholder="请输入结束标识符，如：END 或 ## 或 EOF 等"
-								@change="updateQrContent"
-								allow-clear
-							/>
-							<div class="ant-form-item-explain">
-								<small>添加在二维码内容最后的结束标识符，可选配置</small>
-							</div>
-						</a-form-item>
-					</a-col>
-
 				</a-row>
+
+				<!-- 选择字段 -->
 				<a-form-item label="选择字段" name="selectedFields">
 					<a-select
 						v-model:value="formData.qrCodeConfig.selectedFields"
@@ -332,54 +317,87 @@
 						:options="availableFieldOptions"
 						@change="updateQrContent"
 					/>
-					<div class="ant-form-item-explain">
-						<small>选择的字段将按照所选格式类型生成二维码内容</small>
-					</div>
-				</a-form-item>
-				
-
-				<!-- 编码选项 -->
-				<a-row :gutter="16">
-					<a-col :span="12">
-						<a-form-item label="启用Gzip压缩" name="enableGzip" :label-col="{ span: 6 }">
-							<a-switch
-								v-model:checked="formData.qrCodeConfig.enableGzip"
-								@change="updateQrContent"
-							/>
-							<div class="ant-form-item-explain">
-								<small>启用后二维码内容先进行gzip压缩</small>
-							</div>
-						</a-form-item>
-					</a-col>
-					<a-col :span="12">
-						<a-form-item label="启用Base64编码" name="enableBase64" :label-col="{ span: 6 }">
-							<a-switch
-								v-model:checked="formData.qrCodeConfig.enableBase64"
-								@change="updateQrContent"
-							/>
-							<div class="ant-form-item-explain">
-								<small>启用后二维码内容进行base64编码</small>
-							</div>
-						</a-form-item>
-					</a-col>
-				</a-row>
-
-				<!-- 明细字段循环模式配置 -->
-				<a-form-item v-if="hasDetailFields" label="循环模式" name="detailLoopMode">
-					<a-select
-						v-model:value="formData.qrCodeConfig.detailLoopMode"
-						placeholder="请选择明细字段的循环处理模式"
-						@change="updateQrContent"
-					>
-						<a-select-option value="join">连接模式（所有明细值用分隔符连接）</a-select-option>
-						<a-select-option value="loop">循环模式（为每个明细项生成完整内容）</a-select-option>
-						<a-select-option value="first">首项模式（只使用第一个明细项）</a-select-option>
-					</a-select>
-					<div class="ant-form-item-explain">
-						<small>当二维码包含明细字段时的处理方式</small>
-					</div>
 				</a-form-item>
 
+				<!-- DI前缀配置（仅Custom格式 + 有选中字段时） -->
+				<template v-if="formData.qrCodeConfig.formatType === 'custom' && formData.qrCodeConfig.selectedFields.length > 0">
+					<div class="prefix-config-panel">
+						<div class="prefix-grid prefix-grid-header">
+							<span>字段名称</span>
+							<span>DI前缀</span>
+						</div>
+						<div
+							v-for="fieldKey in formData.qrCodeConfig.selectedFields"
+							:key="fieldKey"
+							class="prefix-grid prefix-grid-row"
+						>
+							<span class="prefix-field-name">{{ getFieldLabel(fieldKey) }}</span>
+							<a-input
+								v-model:value="formData.qrCodeConfig.fieldPrefixes[fieldKey]"
+								placeholder="如：W, 1W, S, 1Q"
+								@change="updateQrContent"
+								allow-clear
+							/>
+						</div>
+					</div>
+				</template>
+
+				<!-- 明细设置（仅当有明细字段时） -->
+				<template v-if="hasDetailFields">
+					<a-row :gutter="16">
+						<a-col :span="12">
+							<a-form-item label="值分隔符" name="itemValueSeparator" :label-col="{ span: 6 }">
+								<a-input
+									v-model:value="formData.qrCodeConfig.itemValueSeparator"
+									placeholder="如：, 或 ;"
+									@change="updateQrContent"
+									allow-clear
+								/>
+								<div class="ant-form-item-explain">
+									<small>同一条明细内多字段间的分隔符</small>
+								</div>
+							</a-form-item>
+						</a-col>
+						<a-col :span="12">
+							<a-form-item label="行分隔符" name="detailRowSeparator" :label-col="{ span: 6 }">
+								<a-input
+									v-model:value="formData.qrCodeConfig.detailRowSeparator"
+									placeholder="如：# 或 @"
+									@change="updateQrContent"
+									allow-clear
+								/>
+								<div class="ant-form-item-explain">
+									<small>多条明细数据之间的分隔符</small>
+								</div>
+							</a-form-item>
+						</a-col>
+					</a-row>
+					<a-form-item label="循环模式" name="detailLoopMode">
+						<a-select
+							v-model:value="formData.qrCodeConfig.detailLoopMode"
+							placeholder="请选择明细字段的循环处理模式"
+							@change="updateQrContent"
+						>
+							<a-select-option value="join">连接（明细值用分隔符连接）</a-select-option>
+							<a-select-option value="loop">循环（每个明细项生成完整内容）</a-select-option>
+							<a-select-option value="first">首项（只取第一个明细项）</a-select-option>
+						</a-select>
+					</a-form-item>
+				</template>
+
+				<!-- 编码方式 -->
+				<a-form-item label="编码方式" name="encodeMode">
+					<a-radio-group v-model:value="formData.qrCodeConfig.encodeMode" @change="updateQrContent">
+						<a-radio value="none">无</a-radio>
+						<a-radio value="base64">仅Base64</a-radio>
+						<a-radio value="gzip_base64">Gzip+Base64</a-radio>
+					</a-radio-group>
+					<div class="ant-form-item-explain">
+						<small>Gzip+Base64 可大幅缩短二维码内容，推荐用于复杂数据</small>
+					</div>
+				</a-form-item>
+
+				<!-- 内容预览 -->
 				<a-form-item v-if="formData.qrCodeConfig.previewContent" label="内容预览">
 					<div class="content-preview">
 						<a-typography-paragraph code copyable>
@@ -696,6 +714,12 @@
 		]
 	}
 
+	// 根据fieldKey获取字段中文名
+	const getFieldLabel = (fieldKey) => {
+		const field = availableFieldOptions.value.find(f => f.value === fieldKey)
+		return field ? field.label : fieldKey
+	}
+
 	// 二维码格式类型变化处理
 	const onFormatTypeChange = (value) => {
 		if (value === 'json') {
@@ -709,6 +733,16 @@
 	// 更新二维码内容预览
 	const updateQrContent = () => {
 		const config = formData.value.qrCodeConfig
+
+		// 解析控制字符文本（保留原始配置不变）
+		const p = (v) => {
+			if (!v) return v
+			return v
+				.replace(/\\x1E/g, String.fromCharCode(30))
+				.replace(/\\x1D/g, String.fromCharCode(29))
+				.replace(/\\x04/g, String.fromCharCode(4))
+				.replace(/\\x1F/g, String.fromCharCode(31))
+		}
 
 		// 检查是否有选中的字段
 		if (!config.selectedFields || config.selectedFields.length === 0) {
@@ -735,56 +769,79 @@
 				config.previewContent = JSON.stringify(jsonObj, null, 2)
 			}
 		} else if (config.formatType === 'custom') {
-			// 自定义分隔符格式 - 直接使用fieldKey拼接
-			const separator = config.separator || '|'
-			config.previewContent = config.selectedFields.join(separator)
-		}
+			// 自定义分隔符格式 - 支持DI前缀
+			const separator = p(config.separator) || '|'
+			const fieldPrefixes = config.fieldPrefixes || {}
+			const hasFieldPrefixes = config.selectedFields.some(fk => fieldPrefixes[fk])
 
-		// 在预览内容最前添加开始标识符（如果配置了的话）
-		if (config.startMarker && config.startMarker.trim() !== '') {
-			config.previewContent = config.startMarker + config.previewContent
-		}
-
-		// 在预览内容最后添加结束标识符（如果配置了的话）
-		if (config.endMarker && config.endMarker.trim() !== '') {
-			if (config.previewContent && config.previewContent.trim() !== '') {
-				config.previewContent = config.previewContent + config.endMarker
+			if (hasFieldPrefixes) {
+				// DI前缀格式： separator + 前缀 + fieldKey
+				const parts = []
+				config.selectedFields.forEach((fieldKey) => {
+					const prefix = fieldPrefixes[fieldKey] || ''
+					parts.push(separator + prefix + fieldKey)
+				})
+				config.previewContent = parts.join('')
 			} else {
-				config.previewContent = config.endMarker
+				// 传统分隔符格式
+				config.previewContent = config.selectedFields.join(separator)
 			}
 		}
 
-		// 编码处理：先gzip压缩，再base64编码
-		if (config.enableGzip || config.enableBase64) {
-			let processed = config.previewContent
-			const tags = []
+		// 在预览内容最前添加开始标识符（如果配置了的话）
+		const startMarker = p(config.startMarker)
+		if (startMarker && startMarker.trim() !== '') {
+			let prefix = startMarker
+			// 如果格式标识有值，自动追加 RS + 格式标识（如：[)> + RS + 21）
+			if (config.formatId && config.formatId.trim() !== '') {
+				prefix += String.fromCharCode(30) + config.formatId
+			}
+			config.previewContent = prefix + config.previewContent
+		}
 
-			if (config.enableGzip) {
+		// 在预览内容最后添加结束标识符（如果配置了的话）
+		const endMarker = p(config.endMarker)
+		if (endMarker && endMarker.trim() !== '') {
+			if (config.previewContent && config.previewContent.trim() !== '') {
+				config.previewContent = config.previewContent + endMarker
+			} else {
+				config.previewContent = endMarker
+			}
+		}
+
+		// 编码处理
+		if (config.encodeMode && config.encodeMode !== 'none') {
+			let processed = config.previewContent
+
+			if (config.encodeMode === 'gzip_base64') {
+				// encodeURI转义非ASCII字符，再gzip压缩（与旧系统兼容）
 				try {
-					const compressed = pako.gzip(processed)
-					// 将压缩后的Uint8Array转为二进制字符串
+					const compressed = pako.gzip(encodeURI(processed))
 					let binaryStr = ''
 					const bytes = new Uint8Array(compressed)
 					for (let i = 0; i < bytes.length; i++) {
 						binaryStr += String.fromCharCode(bytes[i])
 					}
 					processed = binaryStr
-					tags.push('GZIP')
 				} catch (e) {
 					console.warn('gzip压缩失败:', e)
 				}
-			}
-
-			if (config.enableBase64) {
+				// 二进制字符串直接btoa，无需encodeURIComponent
+				try {
+					processed = btoa(processed)
+				} catch (e) {
+					console.warn('base64编码失败:', e)
+				}
+			} else if (config.encodeMode === 'base64') {
+				// 纯文本内容，通过encodeURIComponent处理非ASCII字符后再btoa
 				try {
 					processed = btoa(unescape(encodeURIComponent(processed)))
-					tags.push('BASE64')
 				} catch (e) {
 					console.warn('base64编码失败:', e)
 				}
 			}
 
-			config.previewContent = '[' + tags.join('+') + ']\n' + processed
+			config.previewContent = processed
 		}
 	}
 
@@ -967,9 +1024,10 @@
 					itemValueSeparator: ',', // 添加默认的明细字段值分隔符
 					detailRowSeparator: '#', // 添加默认的明细行分隔符
 					endMarker: '', // 添加默认的结束标识符
-					enableGzip: false, // 是否启用gzip压缩
-					enableBase64: false, // 是否启用base64编码
+					encodeMode: 'none', // 编码方式：none/base64/gzip_base64
+					formatId: '', // ANSI格式标识，如：21
 					startMarker: '', // 添加默认的开始标识符
+					fieldPrefixes: {}, // 字段DI前缀映射
 					previewContent: '',
 					useCodeRule: false,
 					codeRule: ''
@@ -1083,8 +1141,13 @@
 				separator: '|',
 				itemValueSeparator: ',',
 				detailRowSeparator: '#',
+				startMarker: '',
 				endMarker: '',
+				fieldPrefixes: {},
 				previewContent: '',
+				encodeMode: 'none',
+				formatId: '',
+				detailLoopMode: 'join',
 				...parsedOptions.qrCodeConfig
 			},
 			// 动态条码配置
@@ -1128,6 +1191,14 @@
 				validation: { allowFuture: true, allowPast: true },
 				...parsedOptions.dateConfig
 			}
+		}
+
+		// 兼容旧数据：将旧版 enableGzip/enableBase64 迁移为 encodeMode
+		const qrCfg = formData.value.qrCodeConfig
+		if (qrCfg && (qrCfg.enableGzip !== undefined || qrCfg.enableBase64 !== undefined)) {
+			qrCfg.encodeMode = qrCfg.enableGzip ? 'gzip_base64' : (qrCfg.enableBase64 ? 'base64' : 'none')
+			delete qrCfg.enableGzip
+			delete qrCfg.enableBase64
 		}
 
 		// 如果是二维码控件，更新内容预览
@@ -1203,8 +1274,13 @@
 					separator: formData.value.qrCodeConfig.separator,
 					itemValueSeparator: formData.value.qrCodeConfig.itemValueSeparator,
 					detailRowSeparator: formData.value.qrCodeConfig.detailRowSeparator,
+					startMarker: formData.value.qrCodeConfig.startMarker,
 					endMarker: formData.value.qrCodeConfig.endMarker,
-					previewContent: formData.value.qrCodeConfig.previewContent
+					fieldPrefixes: formData.value.qrCodeConfig.fieldPrefixes,
+					previewContent: formData.value.qrCodeConfig.previewContent,
+					encodeMode: formData.value.qrCodeConfig.encodeMode,
+					formatId: formData.value.qrCodeConfig.formatId,
+					detailLoopMode: formData.value.qrCodeConfig.detailLoopMode
 				},
 
 				// 动态条码配置
@@ -1582,6 +1658,43 @@
 		font-size: 12px;
 		color: #666;
 		line-height: 1.4;
+	}
+
+	.prefix-config-panel {
+		border: 1px solid #e8e8e8;
+		border-radius: 6px;
+		padding: 8px 12px;
+		margin-bottom: 16px;
+		background: #fafafa;
+	}
+
+	.prefix-grid {
+		display: grid;
+		grid-template-columns: 1fr 180px;
+		gap: 6px 12px;
+		align-items: center;
+	}
+
+	.prefix-grid-header {
+		font-size: 12px;
+		font-weight: 500;
+		color: #888;
+		padding-bottom: 4px;
+		margin-bottom: 2px;
+		border-bottom: 1px solid #e8e8e8;
+	}
+
+	.prefix-grid-row {
+		padding: 2px 0;
+	}
+
+	.prefix-field-name {
+		font-size: 13px;
+		color: #333;
+		padding-left: 4px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.content-preview {

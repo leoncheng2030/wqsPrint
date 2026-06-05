@@ -175,6 +175,7 @@ import dayjs from 'dayjs'
 import { useFieldManager } from '@/composables/useFieldManager'
 import { useApiOptimization } from '@/composables/useApiOptimization'
 import { usePerformanceOptimization } from '@/composables/usePerformanceOptimization'
+import pako from 'pako'
 
 // 默认是关闭状:
 const visible = ref(false)
@@ -2113,6 +2114,21 @@ const generateQrCodeContent = (qrConfig, dynamicFieldData) => {
 		return ''
 	}
 
+	// 转换控制字符：将 \\x1E(RS) 、\\x1D(GS) 、\\x04(EOT) 等文本转换为实际字节
+	const parseCtrl = (str) => {
+		if (!str) return str
+		return str
+			.replace(/\\x1E/g, String.fromCharCode(30))
+			.replace(/\\x1D/g, String.fromCharCode(29))
+			.replace(/\\x04/g, String.fromCharCode(4))
+			.replace(/\\x1F/g, String.fromCharCode(31))
+	}
+	qrConfig.separator = parseCtrl(qrConfig.separator)
+	qrConfig.startMarker = parseCtrl(qrConfig.startMarker)
+	qrConfig.endMarker = parseCtrl(qrConfig.endMarker)
+	qrConfig.detailRowSeparator = parseCtrl(qrConfig.detailRowSeparator)
+	qrConfig.itemValueSeparator = parseCtrl(qrConfig.itemValueSeparator)
+
 	try {
 		let content = ''
 
@@ -2132,6 +2148,10 @@ const generateQrCodeContent = (qrConfig, dynamicFieldData) => {
 					const separator = qrConfig.separator || qrConfig.customSeparator || '|'
 					// 使用明细行分隔符，如果没有配置则使用默认的井号
 					const detailRowSeparator = qrConfig.detailRowSeparator || '#'
+					// 获取字段DI前缀映射
+					const fieldPrefixes = qrConfig.fieldPrefixes || {}
+					// 判断是否有配置DI前缀
+					const hasFieldPrefixes = selectedFields.some(fk => fieldPrefixes[fk])
 
 					// 判断是否有明细字段
 					const hasDetailFields = selectedFields.some(fieldKey =>
@@ -2159,7 +2179,17 @@ const generateQrCodeContent = (qrConfig, dynamicFieldData) => {
 									rowValues.push('')
 								}
 							})
-							detailParts.push(rowValues.join(separator))
+							// 支持DI前缀格式：每条数据 separator + prefix + value
+							if (hasFieldPrefixes) {
+								const diParts = []
+								selectedFields.forEach((fieldKey, idx) => {
+									const prefix = fieldPrefixes[fieldKey] || ''
+									diParts.push(separator + prefix + (rowValues[idx] || ''))
+								})
+								detailParts.push(diParts.join(''))
+							} else {
+								detailParts.push(rowValues.join(separator))
+							}
 						})
 
 					// 使用明细行分隔符连接各行
@@ -2174,7 +2204,17 @@ const generateQrCodeContent = (qrConfig, dynamicFieldData) => {
 								values.push(dynamicFieldData[fieldKey] || '')
 							}
 						})
-						content = values.join(separator)
+						// 支持DI前缀格式：separator + prefix + value
+						if (hasFieldPrefixes) {
+							const diParts = []
+							selectedFields.forEach((fieldKey, idx) => {
+								const prefix = fieldPrefixes[fieldKey] || ''
+								diParts.push(separator + prefix + (values[idx] || ''))
+							})
+							content = diParts.join('')
+						} else {
+							content = values.join(separator)
+						}
 						console.log('QR Code Content (main only):', content)
 					}
 				}
@@ -2245,6 +2285,20 @@ const generateQrCodeContent = (qrConfig, dynamicFieldData) => {
 				break
 		}
 
+		// 在内容最前添加开始标识符（如果配置了的话）
+		if (qrConfig.startMarker && qrConfig.startMarker.trim() !== '') {
+			let prefix = qrConfig.startMarker
+			// 如果格式标识有值，自动追加 RS + 格式标识（如：[)> + RS + 21）
+			if (qrConfig.formatId && qrConfig.formatId.trim() !== '') {
+				prefix += String.fromCharCode(30) + qrConfig.formatId
+			}
+			if (content && content.trim() !== '') {
+				content = prefix + content
+			} else {
+				content = prefix
+			}
+		}
+
 		// 在内容最后添加结束标识符（如果配置了的话）
 		if (qrConfig.endMarker && qrConfig.endMarker.trim() !== '') {
 			if (content && content.trim() !== '') {
@@ -2252,6 +2306,41 @@ const generateQrCodeContent = (qrConfig, dynamicFieldData) => {
 			} else {
 				content = qrConfig.endMarker
 			}
+		}
+
+		// 编码处理：根据encodeMode进行gzip压缩和/或base64编码
+		if (content && qrConfig.encodeMode && qrConfig.encodeMode !== 'none') {
+			let processed = content
+
+			if (qrConfig.encodeMode === 'gzip_base64') {
+				// encodeURI转义非ASCII字符，再gzip压缩（与旧系统兼容）
+				try {
+					const compressed = pako.gzip(encodeURI(processed))
+					let binaryStr = ''
+					const bytes = new Uint8Array(compressed)
+					for (let i = 0; i < bytes.length; i++) {
+						binaryStr += String.fromCharCode(bytes[i])
+					}
+					processed = binaryStr
+				} catch (e) {
+					console.warn('gzip压缩失败:', e)
+				}
+				// 二进制字符串直接btoa
+				try {
+					processed = btoa(processed)
+				} catch (e) {
+					console.warn('base64编码失败:', e)
+				}
+			} else if (qrConfig.encodeMode === 'base64') {
+				// 纯文本通过encodeURIComponent处理非ASCII后再btoa
+				try {
+					processed = btoa(unescape(encodeURIComponent(processed)))
+				} catch (e) {
+					console.warn('base64编码失败:', e)
+				}
+			}
+
+			content = processed
 		}
 
 		return content
