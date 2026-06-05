@@ -176,6 +176,7 @@ import { useFieldManager } from '@/composables/useFieldManager'
 import { useApiOptimization } from '@/composables/useApiOptimization'
 import { usePerformanceOptimization } from '@/composables/usePerformanceOptimization'
 import pako from 'pako'
+import { getDateFormat, getDateRangeFormat } from '@/utils/dateUtils'
 
 // 默认是关闭状:
 const visible = ref(false)
@@ -424,94 +425,9 @@ const parseQrConfig = (qrCodeConfig) => {
 	}
 }
 
-// 工具函数：获取日期格:
-const getDateFormat = (field) => {
-	// 优先使用新的dateConfig配置
-	if (field.dateConfig && field.dateConfig.displayFormat) {
-		return field.dateConfig.displayFormat
-	}
+// 工具函数：获取日期格式 - 已移至 dateUtils.js 统一管理
 
-	// 向后兼容：使用字段段配置中的时间格:
-	if (field.dateFormat) {
-		return field.dateFormat
-	}
-
-	// 如果没有配置时间格式，则通过 placeholder 来判断（向后兼容:
-	if (field.placeholder) {
-		// 检查是否包含常见的时间格式关键:
-		if (field.placeholder.includes('YYYY-MM-DD HH:mm:ss')) {
-			return 'YYYY-MM-DD HH:mm:ss'
-		} else if (field.placeholder.includes('YYYY-MM-DD HH:mm')) {
-			return 'YYYY-MM-DD HH:mm'
-		} else if (field.placeholder.includes('YYYY-MM-DD')) {
-			return 'YYYY-MM-DD'
-		} else if (field.placeholder.includes('YYYY/MM/DD')) {
-			return 'YYYY/MM/DD'
-		} else if (field.placeholder.includes('MM-DD')) {
-			return 'MM-DD'
-		}
-	}
-	// 默认日期格式
-	return 'YYYY-MM-DD'
-}
-
-// 工具函数：获取日期范围格:
-const getDateRangeFormat = (field) => {
-	// 优先使用新的dateConfig配置
-	if (field.dateConfig && field.dateConfig.displayFormat) {
-		// 如果是范围格式（包含~或其他分隔符），提取单个日期格式
-		const displayFormat = field.dateConfig.displayFormat
-		if (displayFormat.includes('~')) {
-			// 例如:'YYYY.MM.DD~YYYY.MM.DD' -> 'YYYY.MM.DD'
-			return displayFormat.split('~')[0].trim()
-		} else if (displayFormat.includes(' - ')) {
-			// 例如:'YYYY.MM.DD - YYYY.MM.DD' -> 'YYYY.MM.DD'
-			return displayFormat.split(' - ')[0].trim()
-		} else if (displayFormat.includes('-') && displayFormat.match(/\d{4}.*-.*\d{4}/)) {
-			// 处理可能的日期范围格式，但要避免误判单个日期中的连字段:
-			const parts = displayFormat.split('-')
-			if (parts.length > 3) {
-				// 如果分割后超:3部分，可能是范围格式，取前半部分
-				const halfLength = Math.floor(parts.length / 2)
-				return parts.slice(0, halfLength).join('-')
-			}
-		}
-		// 如果不是范围格式，直接使:
-		return displayFormat
-	}
-
-	// 向后兼容：使用字段段配置中的时间格:
-	if (field.dateFormat) {
-		// 如果是范围格式（包含~），提取单个日期格式
-		if (field.dateFormat.includes('~')) {
-			// 例如:'YYYY-MM-DD~YYYY-MM-DD' -> 'YYYY-MM-DD'
-			return field.dateFormat.split('~')[0].trim()
-		} else if (field.dateFormat.includes(' - ')) {
-			// 例如:'YYYY-MM-DD - YYYY-MM-DD' -> 'YYYY-MM-DD'
-			return field.dateFormat.split(' - ')[0].trim()
-		}
-		// 如果不是范围格式，直接使:
-		return field.dateFormat
-	}
-
-	// 如果没有配置时间格式，则通过 placeholder 来判断（向后兼容:
-	if (field.placeholder) {
-		// 检查是否包含常见的时间格式关键:
-		if (field.placeholder.includes('YYYY-MM-DD HH:mm:ss')) {
-			return 'YYYY-MM-DD HH:mm:ss'
-		} else if (field.placeholder.includes('YYYY-MM-DD HH:mm')) {
-			return 'YYYY-MM-DD HH:mm'
-		} else if (field.placeholder.includes('YYYY-MM-DD')) {
-			return 'YYYY-MM-DD'
-		} else if (field.placeholder.includes('YYYY/MM/DD')) {
-			return 'YYYY/MM/DD'
-		} else if (field.placeholder.includes('MM-DD')) {
-			return 'MM-DD'
-		}
-	}
-	// 默认日期格式
-	return 'YYYY-MM-DD'
-}
+// 工具函数：获取日期范围格式 - 已移至 dateUtils.js 统一管理
 
 // 工具函数：设置字段段默认:
 const setFieldDefaultValue = (field) => {
@@ -2239,91 +2155,40 @@ const generateQrCodeContent = (qrConfig, dynamicFieldData) => {
 					)
 
 					if (hasDetailFields && dynamicFieldData.items && dynamicFieldData.items.length > 0) {
-						// US前缀模板解析函数：\x1F→US, \x1E→RS, \x1D→GS, \x04→EOT, {rowNum}→行号, {字段名}→字段值
-						const parseUsPrefix = (template, rowNum, rowItem) => {
-							if (!template) return ''
-							let result = template
-								.replace(/\\x1F/g, String.fromCharCode(31))
-								.replace(/\\x1E/g, String.fromCharCode(30))
-								.replace(/\\x1D/g, String.fromCharCode(29))
-								.replace(/\\x04/g, String.fromCharCode(4))
-								.replace(/\{rowNum\}/g, String(rowNum))
-							// 替换字段引用
-							result = result.replace(/\{(\w+)\}/g, (match, fieldKey) => {
-								if (rowItem && rowItem[fieldKey] !== undefined) return formatFieldValue(rowItem[fieldKey], fieldKey)
-								if (dynamicFieldData[fieldKey] !== undefined) return formatFieldValue(dynamicFieldData[fieldKey], fieldKey)
-								return match
-							})
-							return result
-						}
 						const RS = String.fromCharCode(30)
-						const EOT = String.fromCharCode(4)
 
-						if (qrConfig.perRowEot) {
-							// 旧系统兼容模式：每行 RS + US前缀 + GS字段 + RS EOT，直接拼接（无行分隔符）
-							const rows = []
-							dynamicFieldData.items.forEach((item, idx) => {
-								const rowValues = []
-								selectedFields.forEach((fieldKey) => {
-									if (item.hasOwnProperty(fieldKey)) {
-										rowValues.push(formatFieldValue(item[fieldKey], fieldKey))
-									} else if (dynamicFieldData[fieldKey] !== undefined) {
-										rowValues.push(formatFieldValue(dynamicFieldData[fieldKey], fieldKey))
-									} else {
-										rowValues.push('')
-									}
-								})
-								let rowGsContent = ''
-								if (hasFieldPrefixes) {
-									const diParts = []
-									selectedFields.forEach((fieldKey, i) => {
-										const prefix = fieldPrefixes[fieldKey] || ''
-										diParts.push(separator + prefix + (rowValues[i] || ''))
-									})
-									rowGsContent = diParts.join('')
+						// 明细行分隔符模式
+						const detailParts = []
+						dynamicFieldData.items.forEach((item) => {
+							const rowValues = []
+							selectedFields.forEach((fieldKey) => {
+								if (item.hasOwnProperty(fieldKey)) {
+									rowValues.push(formatFieldValue(item[fieldKey], fieldKey))
+								} else if (dynamicFieldData[fieldKey] !== undefined) {
+									rowValues.push(formatFieldValue(dynamicFieldData[fieldKey], fieldKey))
 								} else {
-									rowGsContent = rowValues.join(separator)
-								}
-								const rowUsContent = parseUsPrefix(qrConfig.rowUsPrefix, idx + 1, item)
-								rows.push(RS + rowUsContent + rowGsContent + RS + EOT)
-							})
-							// 头部US前缀（在 startMarker+formatId 之后，第一行之前）
-							const hdrUsContent = parseUsPrefix(qrConfig.headerUsPrefix, 1, null)
-							content = hdrUsContent + rows.join('')
-						} else {
-							// 原有逻辑：明细行分隔符模式
-							const detailParts = []
-							dynamicFieldData.items.forEach((item) => {
-								const rowValues = []
-								selectedFields.forEach((fieldKey) => {
-									if (item.hasOwnProperty(fieldKey)) {
-										rowValues.push(formatFieldValue(item[fieldKey], fieldKey))
-									} else if (dynamicFieldData[fieldKey] !== undefined) {
-										rowValues.push(formatFieldValue(dynamicFieldData[fieldKey], fieldKey))
-									} else {
-										rowValues.push('')
-									}
-								})
-								if (hasFieldPrefixes) {
-									const diParts = []
-									selectedFields.forEach((fieldKey, i) => {
-										const prefix = fieldPrefixes[fieldKey] || ''
-										diParts.push(separator + prefix + (rowValues[i] || ''))
-									})
-									detailParts.push(diParts.join(''))
-								} else {
-									detailParts.push(rowValues.join(separator))
+									rowValues.push('')
 								}
 							})
-
-							const formatRowSep = qrConfig.formatId && qrConfig.formatId.trim() !== ''
-								? RS + qrConfig.formatId
-								: null
-							const rowSeparator = formatRowSep || detailRowSeparator
-							content = detailParts.join(rowSeparator)
-							if (formatRowSep && content) {
-								content += RS
+							if (hasFieldPrefixes) {
+								const diParts = []
+								selectedFields.forEach((fieldKey, i) => {
+									const prefix = fieldPrefixes[fieldKey] || ''
+									diParts.push(separator + prefix + (rowValues[i] || ''))
+								})
+								detailParts.push(diParts.join(''))
+							} else {
+								detailParts.push(rowValues.join(separator))
 							}
+						})
+
+						const formatRowSep = qrConfig.formatId && qrConfig.formatId.trim() !== ''
+							? RS + qrConfig.formatId
+							: null
+						const rowSeparator = formatRowSep || detailRowSeparator
+						content = detailParts.join(rowSeparator)
+						if (formatRowSep && content) {
+							content += RS
 						}
 						console.log('QR Code Content (with details):', content)
 					} else {

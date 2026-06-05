@@ -385,43 +385,6 @@
 					</a-form-item>
 				</template>
 
-				<!-- 旧系统兼容：US前缀配置（仅Custom格式+明细时显示） -->
-				<template v-if="formData.qrCodeConfig.formatType === 'custom' && hasDetailFields">
-					<a-row :gutter="16">
-						<a-col :span="12">
-							<a-form-item label="头部US前缀" name="headerUsPrefix" :label-col="{ span: 6 }">
-								<a-input
-									v-model:value="formData.qrCodeConfig.headerUsPrefix"
-									placeholder="如：\\x1FSH2\\x1F{Number}"
-									@change="updateQrContent"
-									allow-clear
-								/>
-								<div class="ant-form-item-explain">
-									<small>位于头部 \"[)>RS21\" 之后，使用 \\x1F(US) 分隔，{字段名} 引用数据</small>
-								</div>
-							</a-form-item>
-						</a-col>
-						<a-col :span="12">
-							<a-form-item label="行US前缀" name="rowUsPrefix" :label-col="{ span: 6 }">
-								<a-input
-									v-model:value="formData.qrCodeConfig.rowUsPrefix"
-									placeholder="如：\\x1F\\x1F\\x1F{rowNum}"
-									@change="updateQrContent"
-									allow-clear
-								/>
-								<div class="ant-form-item-explain">
-									<small>位于每行 \"RS\" 之后，{rowNum} 自动递增，{字段名} 引用行数据</small>
-								</div>
-							</a-form-item>
-						</a-col>
-					</a-row>
-					<a-form-item>
-						<a-checkbox v-model:checked="formData.qrCodeConfig.perRowEot" @change="updateQrContent">
-							每行以 RS EOT 结束（去掉行分隔符，改为每行独立 RS ... RS EOT 结构）
-						</a-checkbox>
-					</a-form-item>
-				</template>
-
 				<!-- 编码方式 -->
 				<a-form-item label="编码方式" name="encodeMode">
 					<a-radio-group v-model:value="formData.qrCodeConfig.encodeMode" @change="updateQrContent">
@@ -636,6 +599,7 @@
 	import { useFieldConfig } from '@/composables/useFieldConfig'
 	import dayjs from 'dayjs'
 	import pako from 'pako'
+	import { getDateFormat } from '@/utils/dateUtils'
 
 	// 组件属性
 	const props = defineProps({
@@ -825,28 +789,7 @@
 				mainContent = config.selectedFields.join(separator)
 			}
 
-			// 如果启用perRowEot，使用旧系统兼容结构（每行独立 RS ... RS EOT）
-			if (config.perRowEot) {
-				// 解析前缀模板：\x1F→US, \x1E→RS, \x1D→GS, \x04→EOT, {rowNum}→行号
-				const parsePrefix = (template, rowNum) => {
-					if (!template) return ''
-					return template
-						.replace(/\\x1F/g, String.fromCharCode(31))
-						.replace(/\\x1E/g, String.fromCharCode(30))
-						.replace(/\\x1D/g, String.fromCharCode(29))
-						.replace(/\\x04/g, String.fromCharCode(4))
-						.replace(/\{rowNum\}/g, String(rowNum))
-						.replace(/\{(\w+)\}/g, '$1') // 字段引用用key本身占位
-				}
-				const RS = String.fromCharCode(30)
-				const EOT = String.fromCharCode(4)
-				const hdrPrefix = parsePrefix(config.headerUsPrefix, 1)
-				const rowPrefix = parsePrefix(config.rowUsPrefix, 1)
-				// 结构：头部US + GS字段 + RS + 行US + GS字段 + RS EOT
-				config.previewContent = hdrPrefix + mainContent + RS + rowPrefix + mainContent + RS + EOT
-			} else {
-				config.previewContent = mainContent
-			}
+			config.previewContent = mainContent
 		}
 
 		// 在预览内容最前添加开始标识符（如果配置了的话）
@@ -1089,13 +1032,6 @@
 					encodeMode: 'none', // 编码方式：none/base64/gzip_base64
 					formatId: '', // ANSI格式标识，如：21
 					startMarker: '', // 添加默认的开始标识符
-					fieldPrefixes: {}, // 字段DI前缀映射
-					previewContent: '',
-					useCodeRule: false,
-					codeRule: '',
-					headerUsPrefix: '', // 头部US前缀模板
-					rowUsPrefix: '', // 行US前缀模板
-					perRowEot: false // 每行RS EOT结束
 				},
 				// 动态条码配置
 				dynamicBarcodeConfig: {
@@ -1213,9 +1149,6 @@
 				encodeMode: 'none',
 				formatId: '',
 				detailLoopMode: 'join',
-				headerUsPrefix: '',
-				rowUsPrefix: '',
-				perRowEot: false,
 				...parsedOptions.qrCodeConfig
 			},
 			// 动态条码配置
@@ -1348,10 +1281,7 @@
 					previewContent: formData.value.qrCodeConfig.previewContent,
 					encodeMode: formData.value.qrCodeConfig.encodeMode,
 					formatId: formData.value.qrCodeConfig.formatId,
-					detailLoopMode: formData.value.qrCodeConfig.detailLoopMode,
-					headerUsPrefix: formData.value.qrCodeConfig.headerUsPrefix,
-					rowUsPrefix: formData.value.qrCodeConfig.rowUsPrefix,
-					perRowEot: formData.value.qrCodeConfig.perRowEot
+					detailLoopMode: formData.value.qrCodeConfig.detailLoopMode
 				},
 
 				// 动态条码配置
@@ -1665,16 +1595,7 @@
 		return option.label.toLowerCase().indexOf(input.toLowerCase()) >= 0
 	}
 
-	// 获取日期格式
-	const getDateFormat = (field) => {
-		if (field.dateConfig && field.dateConfig.displayFormat) {
-			return field.dateConfig.displayFormat
-		} else if (field.dateFormat) {
-			return field.dateFormat
-		} else {
-			return 'YYYY-MM-DD'
-		}
-	}
+	// 获取日期格式 - 已移至 dateUtils.js 统一管理
 
 	// 字段选项缓存
 	const fieldOptionsCache = ref({})

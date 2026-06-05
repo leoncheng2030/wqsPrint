@@ -121,6 +121,7 @@
 	import { computed, ref, watch } from 'vue'
 	import { message } from 'ant-design-vue'
 	import dayjs from 'dayjs'
+	import { getDateFormat, getDateRangeFormat, isDateTimeFormat } from '@/utils/dateUtils'
 
 	/**
 	 * 动态字段渲染器组件
@@ -195,115 +196,7 @@
 		return props.modelValue
 	})
 
-	/**
-	 * 获取日期格式
-	 * 优先使用字段配置中的 dateConfig，如果没有则使用 dateFormat，最后通过 placeholder 判断
-	 */
-	const getDateFormat = (field) => {
-		// 优先使用新的dateConfig配置
-		if (field.dateConfig && field.dateConfig.displayFormat) {
-			return field.dateConfig.displayFormat
-		}
-
-		// 向后兼容：使用字段配置中的时间格式
-		if (field.dateFormat) {
-			return field.dateFormat
-		}
-
-		// 如果没有配置时间格式，则通过 placeholder 来判断（向后兼容）
-		if (field.placeholder) {
-			// 检查是否包含常见的时间格式关键词
-			if (field.placeholder.includes('YYYY-MM-DD HH:mm:ss')) {
-				return 'YYYY-MM-DD HH:mm:ss'
-			} else if (field.placeholder.includes('YYYY-MM-DD HH:mm')) {
-				return 'YYYY-MM-DD HH:mm'
-			} else if (field.placeholder.includes('YYYY-MM-DD')) {
-				return 'YYYY-MM-DD'
-			} else if (field.placeholder.includes('YYYY/MM/DD')) {
-				return 'YYYY/MM/DD'
-			} else if (field.placeholder.includes('MM-DD')) {
-				return 'MM-DD'
-			}
-		}
-		// 默认日期格式
-		return 'YYYY-MM-DD'
-	}
-
-	/**
-	 * 获取日期范围格式
-	 * 处理日期范围选择器的格式配置，返回单个日期的格式
-	 */
-	const getDateRangeFormat = (field) => {
-		// 优先使用新的dateConfig配置
-		if (field.dateConfig && field.dateConfig.displayFormat) {
-			// 如果是范围格式（包含~或其他分隔符），提取单个日期格式
-			const displayFormat = field.dateConfig.displayFormat
-			if (displayFormat.includes('~')) {
-				// 例如：'YYYY.MM.DD~YYYY.MM.DD' -> 'YYYY.MM.DD'
-				return displayFormat.split('~')[0].trim()
-			} else if (displayFormat.includes(' - ')) {
-				// 例如：'YYYY.MM.DD - YYYY.MM.DD' -> 'YYYY.MM.DD'
-				return displayFormat.split(' - ')[0].trim()
-			} else if (displayFormat.includes('-') && displayFormat.match(/\d{4}.*-.*\d{4}/)) {
-				// 处理可能的日期范围格式，但要避免误判单个日期中的连字符
-				const parts = displayFormat.split('-')
-				if (parts.length > 3) {
-					// 如果分割后超过3部分，可能是范围格式，取前半部分
-					const halfLength = Math.floor(parts.length / 2)
-					return parts.slice(0, halfLength).join('-')
-				}
-			}
-			// 如果不是范围格式，直接使用
-			return displayFormat
-		}
-
-		// 向后兼容：使用字段配置中的时间格式
-		if (field.dateFormat) {
-			// 如果是范围格式（包含~），提取单个日期格式
-			if (field.dateFormat.includes('~')) {
-				// 例如：'YYYY-MM-DD~YYYY-MM-DD' -> 'YYYY-MM-DD'
-				return field.dateFormat.split('~')[0].trim()
-			} else if (field.dateFormat.includes(' - ')) {
-				// 例如：'YYYY-MM-DD - YYYY-MM-DD' -> 'YYYY-MM-DD'
-				return field.dateFormat.split(' - ')[0].trim()
-			}
-			// 如果不是范围格式，直接使用
-			return field.dateFormat
-		}
-
-		// 如果没有配置时间格式，则通过 placeholder 来判断（向后兼容）
-		if (field.placeholder) {
-			// 检查是否包含常见的时间格式关键词
-			if (field.placeholder.includes('YYYY-MM-DD HH:mm:ss')) {
-				return 'YYYY-MM-DD HH:mm:ss'
-			} else if (field.placeholder.includes('YYYY-MM-DD HH:mm')) {
-				return 'YYYY-MM-DD HH:mm'
-			} else if (field.placeholder.includes('YYYY-MM-DD')) {
-				return 'YYYY-MM-DD'
-			} else if (field.placeholder.includes('YYYY/MM/DD')) {
-				return 'YYYY/MM/DD'
-			} else if (field.placeholder.includes('MM-DD')) {
-				return 'MM-DD'
-			}
-		}
-		// 默认日期格式
-		return 'YYYY-MM-DD'
-	}
-
-	/**
-	 * 判断是否为日期时间格式（需要显示时间选择器）
-	 */
-	const isDateTimeFormat = (field) => {
-		let format
-		// 根据字段类型获取相应的格式
-		if (field.inputType === 'DATE_RANGE') {
-			format = getDateRangeFormat(field)
-		} else {
-			format = getDateFormat(field)
-		}
-		// 如果格式包含时间部分，则显示时间选择器
-		return format.includes('HH:mm')
-	}
+	// 日期格式工具函数已统一移至 dateUtils.js 管理
 
 	// 获取数字精度配置
 	const numberPrecision = computed(() => {
