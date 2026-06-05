@@ -1,0 +1,325 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
+    <meta http-equiv="expires" content="Wed, 26 Feb 1997 08:21:57 GMT">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>采购离线发货单填写</title>
+
+    <script src="./Content/boot.js" type="text/javascript"></script>
+    <script src="./Content/js/apps/miui-form.js?v=200605"></script>
+    <script src="./Content/lib/jquery/jquery-migrate-1.2.1.min.js"></script>
+    <script src="./Content/lib/jquery/jquery.jqprint-0.3.js"></script>
+    <script src="./Content/lib/qrcode/aes.js"></script>
+    <script src="./Content/lib/qrcode/pako.min.js"></script>
+    <script src="./Content/lib/qrcode/qrcode.min.js"></script>
+    <script src="./Content/lib/qrcode/scancommon.js"></script>
+</head>
+
+<body>
+    <div id="printArea">
+        <style>
+            .gprint {
+                border: 1px #000000 solid;
+            }
+
+
+            .mini-grid-table {
+                position: relative;
+                text-align: left;
+                table-layout: fixed;
+                display: table;
+                width: 100%;
+                height: 1px;
+                border: 1px #000000 solid;
+            }
+
+            #grid td {
+                border: 1px #000000 solid;
+                border-collapse: collapse;
+            }
+
+            table td {
+                border: 1px #000000 solid;
+                border-collapse: collapse;
+                height: 30px;
+            }
+
+            table th {
+                border: 1px #000000 solid;
+                border-collapse: collapse;
+                text-align: center;
+                font-weight: 500;
+            }
+
+            .tdborder {
+                height: 30px;
+                word-break: break-all;
+                text-align: left;
+                border: 1px #000000 solid;
+                border-collapse: collapse;
+            }
+        </style>
+
+        <table class="grid" style="border:1px #000000 solid;border-collapse:collapse;width:100%;font-size:12px">
+            <thead>
+                <tr>
+                    <th colspan="8" style="font-size:24px;font-weight:600;text-align:center">物料装箱单</th>
+                    <td colspan="3" rowspan="3">
+                        <div id="imgCode" style="text-align:center;width:150px;margin:0 auto"></div>
+                    </td>
+                </tr>
+                <tr>
+                    <th colspan="2">供应商名称</th>
+                    <td colspan="4" id="CompanyName"></td>
+                    <th>起运<br>日期</th>
+                    <td  id="DepartureDate">  </td>
+
+                </tr>
+                <tr>
+                    <th colspan="2">采购订单号</th>
+                    <td id="OrderNumber"  style="width:15%">xx</td>
+                    <th>运输方式</th>
+                    <td colspan="2" id="TransType">xx</td>
+                    <th >运输<br>单号</th>
+                    <td  id="TrackingNo">xx</td>
+                    <!--<th>车牌号</th>
+    <td colspan="3" id="VehicleNo">xx</td>-->
+                </tr>
+                <tr>
+                    <th style="width:8%;height:30px">采购订单<br>行项目</th>
+                    <th style="width:10%;height:30px">集团<br>物品码</th>
+                    <th colspan="2" style="width:25%">物料描述</th>
+                    <th style="width:6%">发货<br>数量</th>
+                    <th style="width:6%">计量<br>单位</th>
+                    <th style="width:6%">使用<br>范围</th>
+                    <th style="width:12%">油封日期</th>
+                    <th style="width:10%">到期日</th>
+                    <th style="width:11%">批次/<br>序列号</th>
+                    <th style="width:6%">油隙值</th>
+                </tr>
+            </thead>
+            <tbody id="grid" name="grid">
+                <!--
+                <tr>
+                    <td>序号</td>
+                    <td>产品项目</td>
+                    <td> 材料/零件号</td>
+                    <td>零件名称</td>
+                    <td>批次号</td>
+                    <td>外委工序号</td>
+                    <td>计量单位</td>
+                    <td> 计划返回</td>
+                    <td> 发货数</td>
+                    <td>备注</td>
+                </tr>-->
+            </tbody>
+        </table>
+
+    </div>
+</body>
+</html>
+<!--表格组件end-->
+<script type="text/javascript">
+
+    mini.parse();
+    // var form = new mini.Form("form1");
+    // var grid = mini.get("datagrid1");
+    var strCode = "";
+    var OrderNumber = "";
+    $(function () {
+        SetData();
+    });
+
+    ////////////////////
+    //标准方法接口定义
+    function SetData(data) {
+        data = mini.decode(localStorage["sccpcgofflineitem"]);
+       
+        $("#CompanyName").text(data.formData.CompanyName + "(" + data.formData.CompanyCode+")");
+        $("#VehicleNo").text(data.formData.VehicleNo);
+        $("#TrackingNo").text(data.formData.TrackingNo);
+        $("#TransType").text(data.formData.TransType);
+        $("#DepartureDate").text(mini.formatDate(data.formData.DepartureDate, "yyyyMMdd"));
+        OrderNumber = data.formData.OrderNumber;
+        $("#OrderNumber").text(OrderNumber);
+        //  $("#DemandDeptName").text(data.formData.DemandDeptName);
+
+        //strCode += data.formData.CompanyID  + String.fromCharCode(31)+data.formData.ContractNo + data.formData.Number ;
+        //SH1带料发货，SH2不带料发货，SH3 非系统带料发货，SH4非系统不带料发货
+        // strCode += "SH2" + String.fromCharCode(30) + data.formData.NumericalOrder + String.fromCharCode(31) + data.formData.Number + String.fromCharCode(31) + mini.formatDate(data.formData.DataDate, "yyyy-MM-dd") + String.fromCharCode(31) + data.formData.CompanyID;
+        strCode += "[)>" + String.fromCharCode(30) + "21";
+        strCode += String.fromCharCode(31) + "SH2";
+        strCode += String.fromCharCode(31) + "";//data.formData.NumericalOrder;
+        strCode += String.fromCharCode(31) + data.formData.Number;
+        strCode += String.fromCharCode(31) + mini.formatDate(data.formData.DepartureDate, "yyyy-MM-dd");data.formData.DataDate;
+        strCode += String.fromCharCode(31) + "";//data.formData.CompanyID;
+        strCode += String.fromCharCode(31) + data.formData.TransType;
+        strCode += String.fromCharCode(31) + data.formData.TrackingNo;
+        strCode += String.fromCharCode(31) + data.formData.VehicleNo;
+        strCode += String.fromCharCode(29) + "M" + data.formData.CompanyCode;
+        strCode += String.fromCharCode(29) + "6D" + mini.formatDate(data.formData.DepartureDate, "yyyy-MM-dd");
+
+        fillData(data.gridData);
+
+
+    }
+
+    function CloseWindow(action) {
+
+        if (window.CloseOwnerWindow) return window.CloseOwnerWindow(action);
+        else window.close();
+    }
+    function onPrint(e) {
+
+        $("#printArea").jqprint({ importCSS: true, operaSupport: true });
+		window.close();
+        setTimeout(function () { CloseWindow("cancel"); }, 3000);
+    }
+    function onCancel(e) {
+        CloseWindow("cancel");
+    }
+
+    function onRenderer(e) {
+        if (e.field == "MaterialCode") {
+            var rel = e.value + "/" + e.record.PartNumber;
+            return rel;
+
+        }
+    }
+
+    //填充数据
+    function fillData(json) {
+
+        var table = document.body.querySelector('#grid');
+
+        var html = "";
+        var deliveryTotalQuantity = 0;
+        for (var i = 0; i < json.length; i++) {
+            var item = json[i];
+
+            if (i == 0) {
+
+            }
+     
+            var tr = document.createElement('tr');
+            tr.className = '';
+            var description = item.Description;
+            //if (!description) {
+            //    description = item.ProductName + item.MaterialCode + " " + item.PartNumber + " " + item.Spec;
+            //}
+
+            item.BatchNumber + (item.SerialNumber ? "/" + item.SerialNumber : "")
+            var batchNumber = "";
+            if (item.BatchNumber) {
+                batchNumber += item.BatchNumber;
+            }
+            if (item.SerialNumber) {
+                if (item.BatchNumber) {
+                    batchNumber += "-";
+                }
+                batchNumber += item.SerialNumber;
+            }
+            batchNumber = item.SerialNumber;
+            html = "<td   style='word-break:break-all;text-align:center;border:1px #000000 solid;border-collapse:collapse;'>" + item.OrderItemNo +
+                "</td><td  style='word-break:break-all;text-align:center;border:1px #000000 solid;border-collapse:collapse;'>" + item.GroupMaterialCode +
+                "</td><td  style='word-break:break-all;text-align:left;border:1px #fffffff solid;border-collapse:collapse;' colspan='2'>" + description +
+                "</td><td  style='word-break:break-all;text-align:center;border:1px #000000 solid;border-collapse:collapse;'>" + item.Quantity +
+                "</td><td  style='word-break:break-all;text-align:center;border:1px #000000 solid;border-collapse:collapse;'>" + item.MeasureUnitName +
+                "</td><td  style='word-break:break-all;text-align:center;border:1px #000000 solid;border-collapse:collapse;'>" + item.UseScope +
+                "</td><td  style='word-break:break-all;text-align:center;border:1px #000000 solid;border-collapse:collapse;'>" + mini.formatDate(new Date(item.OilSealDate), "yyyyMMdd") +
+                "</td><td  style='word-break:break-all;text-align:center;border:1px #000000 solid;border-collapse:collapse;'>" + mini.formatDate(new Date(item.ExpiredDate), "yyyyMMdd") +
+                "</td><td  style='word-break:break-all;text-align:center;border:1px #000000 solid;border-collapse:collapse;'>" + batchNumber +
+                "</td><td  style='word-break:break-all;text-align:center;border:1px #000000 solid;border-collapse:collapse;'>" + item.ClearanceValue +
+
+                "</td>";
+            deliveryTotalQuantity += item.Quantity;
+            tr.innerHTML = html;
+            table.insertBefore(tr, table.lasttChild);
+            //二维码数据
+            //strCode += item.SAPSN + String.fromCharCode(31) + item.OrderNumber + String.fromCharCode(31) + item.MaterialCode
+            //    + String.fromCharCode(31) + item.BatchNumber + String.fromCharCode(31) + item.Quantity
+            //    + String.fromCharCode(31) + item.RawDeliveryNumber;
+            //  strCode += String.fromCharCode(30) + item.NumericalOrderDetail + String.fromCharCode(31) + item.CoordinationTaskID + String.fromCharCode(31) + item.Quantity
+            //     + String.fromCharCode(31) + (item.SerialNumber ? item.SerialNumber : "") + String.fromCharCode(31) + mini.formatDate(item.IssueDate, "yyyy-MM-dd") + String.fromCharCode(31) + item.ItemNo;
+            strCode += String.fromCharCode(30);
+            strCode += String.fromCharCode(31);
+            strCode += "";//item.NumericalOrderDetail;
+            strCode += String.fromCharCode(31) + "";//item.CoordinationTaskID;
+            strCode += String.fromCharCode(31) + (i+1);//item.ItemNo;
+            strCode += String.fromCharCode(31) + mini.formatDate(new Date(item.OilSealDate), "yyyy-MM-dd");
+            strCode += String.fromCharCode(31) + item.ClearanceValue;
+            strCode += String.fromCharCode(29) + "W" + (item.GroupMaterialCode ? item.GroupMaterialCode : "");
+            strCode += String.fromCharCode(29) + "1W" + item.MaterialCode;
+            strCode += String.fromCharCode(29) + "S" + item.BatchNumber + (item.SerialNumber ? "/" + item.SerialNumber : "");
+            strCode += String.fromCharCode(29) + "J" + item.UseScope;
+            strCode += String.fromCharCode(29) + "1Q" + item.Quantity;
+            strCode += String.fromCharCode(29) + "1B" + item.TechConditionVer;
+            strCode += String.fromCharCode(29) + "1S" + item.DeliveryState;
+            strCode += String.fromCharCode(29) + "15D" + mini.formatDate(new Date(item.ExpiredDate), "yyyy-MM-dd");
+            strCode += String.fromCharCode(29) + "C" + OrderNumber;
+            strCode += String.fromCharCode(29) + "1C" + item.OrderItemNo;
+            strCode += String.fromCharCode(30) + String.fromCharCode(4);
+        }
+        var tr = document.createElement('tr');
+        html = "<td colspan=2 style='height:40px;word-break:break-all;text-align:center;border:1px #000000 solid;border-collapse:collapse;'>合计</td><td colspan=5></td><td style='height:40px;word-break:break-all;text-align:left;border:1px #000000 solid;border-collapse:collapse;'>" + deliveryTotalQuantity + "</td><td colspan=6></td>"
+        // tr.innerHTML = html;
+        // table.insertBefore(tr, table.lasttChild);
+        //生成二维码
+        var obj = generateCode(strCode);
+        var interval = setInterval(function () {
+            if (obj) {
+                onPrint();
+                clearInterval(interval);
+            }
+
+        }, 100);
+        //"加载成功"
+
+    }
+    //////////////////////////////////
+    //生成二维码
+    function generateCode(code) {
+        console.log("code========" + code);
+
+        var zipStr = zip(encodeURI(code));
+        // var zipStr = code;
+        try {
+            //生成二维码
+            return generateQRCode("imgCode", "table", 150, 150, zipStr);
+            //  return generateQRCode("imgCode", "table", 150, 150, code);
+
+        } catch (e) {
+            console.log("errorcode========" + code);
+
+            alert("生成出库单二维码失败" + e);
+
+        }
+    }
+    function unzip(b64Data) {
+        var strData = atob(b64Data);
+        // Convert binary string to character-number array
+        var charData = strData.split('').map(function (x) {
+            return x.charCodeAt(0);
+        });
+        // Turn number array into byte-array
+        var binData = new Uint8Array(charData);
+        // // unzip
+        var data = pako.inflate(binData);
+        // Convert gunzipped byteArray back to ascii string:
+        strData = String.fromCharCode.apply(null, new Uint16Array(data));
+        return strData;
+    }
+
+    function zip(str) {
+        var binaryString = pako.gzip(str, {
+            to: 'string'
+        });
+        return btoa(binaryString);
+    }
+            ////////////////二维码结束
+
+</script>
