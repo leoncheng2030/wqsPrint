@@ -121,11 +121,18 @@ export function useFieldManager() {
           const staticOptions = typeof parsedConfig.staticOptions === 'string'
             ? JSON.parse(parsedConfig.staticOptions)
             : parsedConfig.staticOptions
-          
+                
           if (Array.isArray(staticOptions)) {
+            // 数组格式：[{label: 'xxx', value: 'xxx'}]
             options = staticOptions.map(option => ({
               label: option.label || option.value,
               value: option.value
+            }))
+          } else if (typeof staticOptions === 'object' && staticOptions !== null) {
+            // 对象格式：{"key": "value"} 或 {"value": "label"}
+            options = Object.entries(staticOptions).map(([key, value]) => ({
+              label: value || key,
+              value: key
             }))
           }
         }

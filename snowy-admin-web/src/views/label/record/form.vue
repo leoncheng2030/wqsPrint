@@ -217,11 +217,15 @@ const serialNumberRangeConfig = ref({
 const { withDeduplication, handleError: handleApiError } = useApiOptimization()
 const {
 	loadTemplateFields: loadFieldsOptimized,
-	getFieldOptions,
 	setFieldDefaultValue: setFieldDefaultValueOptimized,
 	getFieldRules: getDynamicFieldRules,
 	clearCache: clearFieldCache
 } = useFieldManager()
+
+// 本地 getFieldOptions 方法，使用本地的 fieldOptionsCache
+const getFieldOptions = (field) => {
+	return fieldOptionsCache.value[field.fieldKey] || []
+}
 
 // 计算属性 - 简化缓存逻辑
 const filteredDynamicFields = computed(() => {
@@ -990,6 +994,8 @@ const loadSingleFieldOptions = async (field) => {
 		if (field.optionsData) {
 			try {
 				const parsedConfig = JSON.parse(field.optionsData)
+				
+				console.log(`[字段选项加载] 字段: ${field.title}, 数据来源: ${parsedConfig.dataSource}, 配置:`, parsedConfig)
 
 				// 检查是否有静态选项
 				if (parsedConfig.staticOptions) {
@@ -1000,10 +1006,19 @@ const loadSingleFieldOptions = async (field) => {
 							: parsedConfig.staticOptions
 
 						if (Array.isArray(staticOptions)) {
+							// 数组格式：[{label: 'xxx', value: 'xxx'}]
 							options = staticOptions.map(option => ({
 								label: option.label || option.value,
 								value: option.value
 							}))
+							console.log(`[字段选项加载] 字段: ${field.title}, 静态选项加载成功(数组格式), 数量: ${options.length}`)
+						} else if (typeof staticOptions === 'object' && staticOptions !== null) {
+							// 对象格式：{"key": "value"} 或 {"value": "label"}
+							options = Object.entries(staticOptions).map(([key, value]) => ({
+								label: value || key,
+								value: key
+							}))
+							console.log(`[字段选项加载] 字段: ${field.title}, 静态选项加载成功(对象格式), 数量: ${options.length}`)
 						}
 					} catch (e) {
 						console.warn(`解析字段 "${field.title}" 的静态选项失败:`, e)
@@ -1016,6 +1031,7 @@ const loadSingleFieldOptions = async (field) => {
 					const dictOptions = tool.dictList(parsedConfig.dictTypeCode)
 					if (dictOptions && dictOptions.length > 0) {
 						options = dictOptions
+						console.log(`[字段选项加载] 字段: ${field.title}, 字典选项加载成功, 数量: ${options.length}`)
 					}
 				}
 
@@ -1034,11 +1050,13 @@ const loadSingleFieldOptions = async (field) => {
 			const dictOptions = tool.dictList(field.dictTypeCode)
 			if (dictOptions && dictOptions.length > 0) {
 				options = dictOptions
+				console.log(`[字段选项加载] 字段: ${field.title}, 向后兼容字典选项加载成功, 数量: ${options.length}`)
 			}
 		}
 
 		// 缓存字段选项
 		fieldOptionsCache.value[field.fieldKey] = options
+		console.log(`[字段选项加载] 字段: ${field.title}, 最终缓存选项数量: ${options.length}`)
 
 	} catch (error) {
 		console.error(`加载字段 "${field.title}" 选项失败:`, error)
@@ -1453,6 +1471,16 @@ const formatFieldValueForSave = (field, value) => {
 
 	// 处理日期字段段
 	if (field.inputType === 'DATE') {
+		// 处理 Excel 序列号日期数字（如 44960），转为日期字符串
+		if (typeof value === 'number' && value > 0) {
+			try {
+				const date = dayjs('1899-12-30').add(value, 'day')
+				if (date.isValid()) {
+					const targetFormat = field.dateConfig?.saveFormat || field.dateConfig?.displayFormat || 'YYYY-MM-DD'
+					value = date.format(targetFormat)
+				}
+			} catch (e) {}
+		}
 		// 如果日期字段段值为空，使用当前日期作为默认:
 		if (!value || (typeof value === 'string' && value.trim() === '')) {
 			const format = getDateFormat(field)
@@ -1697,6 +1725,23 @@ const formatFieldValueForSave = (field, value) => {
 		}
 	}
 
+	// 处理数字字段段的小数位:（从optionsData中解析numberConfig:
+	if (field.inputType === 'NUMBER' && field.optionsData) {
+		try {
+			const options = typeof field.optionsData === 'string'
+				? JSON.parse(field.optionsData)
+				: field.optionsData
+			if (options.numberConfig && options.numberConfig.precision !== undefined && options.numberConfig.precision >= 0) {
+				const num = Number(value)
+				if (!isNaN(num)) {
+					return num.toFixed(options.numberConfig.precision)
+				}
+			}
+		} catch (e) {
+			// 解析失败时返回原始值
+		}
+	}
+
 	// 其他字段段类型直接返回原:
 	return value
 }
@@ -1709,6 +1754,17 @@ const formatFieldValueForDisplay = (field, value) => {
 
 	// 处理日期字段段
 	if (field.inputType === 'DATE') {
+		// 处理 Excel 序列号日期数字（如 44960）
+		if (typeof value === 'number' && value > 0) {
+			try {
+				// Excel 序列号：从 1899-12-30 起的天数
+				const date = dayjs('1899-12-30').add(value, 'day')
+				if (date.isValid()) {
+					const targetFormat = field.dateConfig?.displayFormat || 'YYYY-MM-DD'
+					return date.format(targetFormat)
+				}
+			} catch (e) {}
+		}
 		// 如果字段段有日期配置，且值不为空
 		if (typeof value === 'string' && value.trim() !== '') {
 			try {
@@ -2001,10 +2057,10 @@ const formatFieldValueForDisplay = (field, value) => {
 // 								// 首先检查是否为明细字段（在明细数据中存在且值会变化）
 // 								if (item.hasOwnProperty(fieldKey)) {
 // 									// 明细字段：使用当前行数据
-// 									rowValues.push(item[fieldKey] || '')
+// 									rowValues.push(formatFieldValue(item[fieldKey], fieldKey))
 // 								} else if (dynamicFieldData[fieldKey] !== undefined) {
 // 									// 主字段：使用主表数据
-// 									rowValues.push(dynamicFieldData[fieldKey] || '')
+// 									rowValues.push(formatFieldValue(dynamicFieldData[fieldKey], fieldKey))
 // 								} else {
 // 									// 字段不存在，添加空值
 // 									rowValues.push('')
@@ -2040,7 +2096,7 @@ const formatFieldValueForDisplay = (field, value) => {
 // 						} else if (dynamicFieldData.items && dynamicFieldData.items.length > 0) {
 // 							// 如果是明细字段段，从items中获取所有条目的值并连接
 // 							const itemValues = dynamicFieldData.items.map(item =>
-// 								item[fieldKey] !== undefined ? item[fieldKey] : ''
+// 								item[fieldKey] !== undefined ? formatFieldValue(item[fieldKey], fieldKey) : ''
 // 							)
 // 							// 使用配置中的明细值分隔符，如果没有则使用默认:','
 // 							const itemValueSeparator = qrConfig.itemValueSeparator || ','
@@ -2074,7 +2130,7 @@ const formatFieldValueForDisplay = (field, value) => {
 // 						} else if (dynamicFieldData.items && dynamicFieldData.items.length > 0) {
 // 							// 如果是明细字段段，从items中获取所有条目的值并连接
 // 							const itemValues = dynamicFieldData.items.map(item =>
-// 								item[fieldKey] !== undefined ? item[fieldKey] : ''
+// 								item[fieldKey] !== undefined ? formatFieldValue(item[fieldKey], fieldKey) : ''
 // 							)
 // 							// 使用配置中的明细值分隔符，如果没有则使用默认:','
 // 							const itemValueSeparator = qrConfig.itemValueSeparator || ','
@@ -2107,6 +2163,29 @@ const formatFieldValueForDisplay = (field, value) => {
 // 		return ''
 // 	}
 // }
+
+// 根据字段配置格式化字段值（如数字小数位数）
+const formatFieldValue = (value, fieldKey) => {
+	if (value === undefined || value === null) return ''
+	// 查找字段配置
+	const field = dynamicFields.value.find(f => f.fieldKey === fieldKey)
+	if (field && field.optionsData) {
+		try {
+			const options = typeof field.optionsData === 'string'
+				? JSON.parse(field.optionsData)
+				: field.optionsData
+			if (options.numberConfig && options.numberConfig.precision !== undefined && options.numberConfig.precision >= 0) {
+				const num = Number(value)
+				if (!isNaN(num)) {
+					return num.toFixed(options.numberConfig.precision)
+				}
+			}
+		} catch (e) {
+			// 解析失败时返回原始值
+		}
+	}
+	return String(value ?? '')
+}
 
 // 根据二维码配置和动态字段段数据生成二维码内容
 const generateQrCodeContent = (qrConfig, dynamicFieldData) => {
@@ -2160,48 +2239,100 @@ const generateQrCodeContent = (qrConfig, dynamicFieldData) => {
 					)
 
 					if (hasDetailFields && dynamicFieldData.items && dynamicFieldData.items.length > 0) {
-						// 如果有明细字段，按行循环处理，每行按配置顺序排列字段
-						const detailParts = []
+						// US前缀模板解析函数：\x1F→US, \x1E→RS, \x1D→GS, \x04→EOT, {rowNum}→行号, {字段名}→字段值
+						const parseUsPrefix = (template, rowNum, rowItem) => {
+							if (!template) return ''
+							let result = template
+								.replace(/\\x1F/g, String.fromCharCode(31))
+								.replace(/\\x1E/g, String.fromCharCode(30))
+								.replace(/\\x1D/g, String.fromCharCode(29))
+								.replace(/\\x04/g, String.fromCharCode(4))
+								.replace(/\{rowNum\}/g, String(rowNum))
+							// 替换字段引用
+							result = result.replace(/\{(\w+)\}/g, (match, fieldKey) => {
+								if (rowItem && rowItem[fieldKey] !== undefined) return formatFieldValue(rowItem[fieldKey], fieldKey)
+								if (dynamicFieldData[fieldKey] !== undefined) return formatFieldValue(dynamicFieldData[fieldKey], fieldKey)
+								return match
+							})
+							return result
+						}
+						const RS = String.fromCharCode(30)
+						const EOT = String.fromCharCode(4)
 
-						dynamicFieldData.items.forEach((item) => {
-							const rowValues = []
-							// 按照配置的字段顺序处理每一行
-							selectedFields.forEach((fieldKey) => {
-								// 首先检查是否为明细字段（在明细数据中存在且值会变化）
-								if (item.hasOwnProperty(fieldKey)) {
-									// 明细字段：使用当前行数据
-									rowValues.push(item[fieldKey] || '')
-								} else if (dynamicFieldData[fieldKey] !== undefined) {
-									// 主字段：使用主表数据
-									rowValues.push(dynamicFieldData[fieldKey] || '')
+						if (qrConfig.perRowEot) {
+							// 旧系统兼容模式：每行 RS + US前缀 + GS字段 + RS EOT，直接拼接（无行分隔符）
+							const rows = []
+							dynamicFieldData.items.forEach((item, idx) => {
+								const rowValues = []
+								selectedFields.forEach((fieldKey) => {
+									if (item.hasOwnProperty(fieldKey)) {
+										rowValues.push(formatFieldValue(item[fieldKey], fieldKey))
+									} else if (dynamicFieldData[fieldKey] !== undefined) {
+										rowValues.push(formatFieldValue(dynamicFieldData[fieldKey], fieldKey))
+									} else {
+										rowValues.push('')
+									}
+								})
+								let rowGsContent = ''
+								if (hasFieldPrefixes) {
+									const diParts = []
+									selectedFields.forEach((fieldKey, i) => {
+										const prefix = fieldPrefixes[fieldKey] || ''
+										diParts.push(separator + prefix + (rowValues[i] || ''))
+									})
+									rowGsContent = diParts.join('')
 								} else {
-									// 字段不存在，添加空值
-									rowValues.push('')
+									rowGsContent = rowValues.join(separator)
+								}
+								const rowUsContent = parseUsPrefix(qrConfig.rowUsPrefix, idx + 1, item)
+								rows.push(RS + rowUsContent + rowGsContent + RS + EOT)
+							})
+							// 头部US前缀（在 startMarker+formatId 之后，第一行之前）
+							const hdrUsContent = parseUsPrefix(qrConfig.headerUsPrefix, 1, null)
+							content = hdrUsContent + rows.join('')
+						} else {
+							// 原有逻辑：明细行分隔符模式
+							const detailParts = []
+							dynamicFieldData.items.forEach((item) => {
+								const rowValues = []
+								selectedFields.forEach((fieldKey) => {
+									if (item.hasOwnProperty(fieldKey)) {
+										rowValues.push(formatFieldValue(item[fieldKey], fieldKey))
+									} else if (dynamicFieldData[fieldKey] !== undefined) {
+										rowValues.push(formatFieldValue(dynamicFieldData[fieldKey], fieldKey))
+									} else {
+										rowValues.push('')
+									}
+								})
+								if (hasFieldPrefixes) {
+									const diParts = []
+									selectedFields.forEach((fieldKey, i) => {
+										const prefix = fieldPrefixes[fieldKey] || ''
+										diParts.push(separator + prefix + (rowValues[i] || ''))
+									})
+									detailParts.push(diParts.join(''))
+								} else {
+									detailParts.push(rowValues.join(separator))
 								}
 							})
-							// 支持DI前缀格式：每条数据 separator + prefix + value
-							if (hasFieldPrefixes) {
-								const diParts = []
-								selectedFields.forEach((fieldKey, idx) => {
-									const prefix = fieldPrefixes[fieldKey] || ''
-									diParts.push(separator + prefix + (rowValues[idx] || ''))
-								})
-								detailParts.push(diParts.join(''))
-							} else {
-								detailParts.push(rowValues.join(separator))
-							}
-						})
 
-					// 使用明细行分隔符连接各行
-					content = detailParts.join(detailRowSeparator)
-					console.log('QR Code Content (with details):', content)
+							const formatRowSep = qrConfig.formatId && qrConfig.formatId.trim() !== ''
+								? RS + qrConfig.formatId
+								: null
+							const rowSeparator = formatRowSep || detailRowSeparator
+							content = detailParts.join(rowSeparator)
+							if (formatRowSep && content) {
+								content += RS
+							}
+						}
+						console.log('QR Code Content (with details):', content)
 					} else {
 						// 如果没有明细字段，只处理主字段
 						const values = []
 						// 按照用户选择的字段顺序处理
 						selectedFields.forEach((fieldKey) => {
 							if (dynamicFieldData[fieldKey] !== undefined) {
-								values.push(dynamicFieldData[fieldKey] || '')
+								values.push(formatFieldValue(dynamicFieldData[fieldKey], fieldKey))
 							}
 						})
 						// 支持DI前缀格式：separator + prefix + value
@@ -2227,11 +2358,11 @@ const generateQrCodeContent = (qrConfig, dynamicFieldData) => {
 					// 按照用户选择的字段顺序处理
 					selectedFields.forEach((fieldKey) => {
 						if (dynamicFieldData[fieldKey] !== undefined) {
-							jsonData[fieldKey] = dynamicFieldData[fieldKey] || ''
+							jsonData[fieldKey] = formatFieldValue(dynamicFieldData[fieldKey], fieldKey)
 						} else if (dynamicFieldData.items && dynamicFieldData.items.length > 0) {
 							// 如果是明细字段段，从items中获取所有条目的值并连接
 							const itemValues = dynamicFieldData.items.map(item =>
-								item[fieldKey] !== undefined ? item[fieldKey] : ''
+								item[fieldKey] !== undefined ? formatFieldValue(item[fieldKey], fieldKey) : ''
 							)
 							// 使用配置中的明细值分隔符，如果没有则使用默认:','
 							const itemValueSeparator = qrConfig.itemValueSeparator || ','
@@ -2262,11 +2393,11 @@ const generateQrCodeContent = (qrConfig, dynamicFieldData) => {
 					selectedFields.forEach((fieldKey) => {
 						let value = ''
 						if (dynamicFieldData[fieldKey] !== undefined) {
-							value = dynamicFieldData[fieldKey] || ''
+							value = formatFieldValue(dynamicFieldData[fieldKey], fieldKey)
 						} else if (dynamicFieldData.items && dynamicFieldData.items.length > 0) {
 							// 如果是明细字段段，从items中获取所有条目的值并连接
 							const itemValues = dynamicFieldData.items.map(item =>
-								item[fieldKey] !== undefined ? item[fieldKey] : ''
+								item[fieldKey] !== undefined ? formatFieldValue(item[fieldKey], fieldKey) : ''
 							)
 							// 使用配置中的明细值分隔符，如果没有则使用默认:','
 							const itemValueSeparator = qrConfig.itemValueSeparator || ','
@@ -2313,9 +2444,10 @@ const generateQrCodeContent = (qrConfig, dynamicFieldData) => {
 			let processed = content
 
 			if (qrConfig.encodeMode === 'gzip_base64') {
-				// encodeURI转义非ASCII字符，再gzip压缩（与旧系统兼容）
+				// 完整encodeURI，与旧系统print1.html一致（编码控制符、特殊字符和中文）
+				const softEncode = (s) => encodeURI(s)
 				try {
-					const compressed = pako.gzip(encodeURI(processed))
+					const compressed = pako.gzip(softEncode(processed))
 					let binaryStr = ''
 					const bytes = new Uint8Array(compressed)
 					for (let i = 0; i < bytes.length; i++) {

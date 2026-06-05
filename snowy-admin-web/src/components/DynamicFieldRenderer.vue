@@ -23,6 +23,7 @@
 		<a-input-number
 			v-else-if="field.inputType === 'NUMBER'"
 			:value="modelValue"
+			:precision="numberPrecision"
 			:placeholder="compact ? field.title : '请输入' + field.title"
 			:size="compact ? 'small' : 'middle'"
 			class="xn-wd"
@@ -173,13 +174,23 @@
 	}
 
 	/**
-	 * 计算属性：处理日期值，如果为空则默认为当前日期
+	 * 计算属性：处理日期值，转为 dayjs 对象确保日期控件正确显示
 	 */
 	const dateValue = computed(() => {
-		// 如果是日期类型且值为空，则默认为当前日期
-		if (props.field.inputType === 'DATE' && (!props.modelValue || props.modelValue === '')) {
+		if (props.field.inputType === 'DATE') {
+			if (!props.modelValue || props.modelValue === '') {
+				// 如果为空，使用当前日期
+				return dayjs()
+			}
+			// 处理 Excel 序列号日期数字（兜底保护）
+			if (typeof props.modelValue === 'number' && props.modelValue > 0) {
+				const date = dayjs('1899-12-30').add(props.modelValue, 'day')
+				if (date.isValid()) return date
+			}
+			// 将字符串转换为 dayjs 对象，确保日期控件正确回显
 			const format = getDateFormat(props.field)
-			return dayjs().format(format)
+			const parsed = dayjs(props.modelValue, format)
+			return parsed.isValid() ? parsed : dayjs(props.modelValue)
 		}
 		return props.modelValue
 	})
@@ -294,14 +305,27 @@
 		return format.includes('HH:mm')
 	}
 
+	// 获取数字精度配置
+	const numberPrecision = computed(() => {
+		if (props.field.inputType !== 'NUMBER' || !props.field.optionsData) return undefined
+		try {
+			const options = typeof props.field.optionsData === 'string'
+				? JSON.parse(props.field.optionsData)
+				: props.field.optionsData
+			if (options.numberConfig && options.numberConfig.precision !== undefined && options.numberConfig.precision >= 0) {
+				return options.numberConfig.precision
+			}
+		} catch (e) {
+			// 解析失败，返回 undefined
+		}
+		return undefined
+	})
+
 	// 计算属性：处理日期范围值的格式转换
 	const dateRangeValue = computed(() => {
 		// 如果是日期范围类型且值为空，则默认为当前日期到未来一周
 		if (props.field.inputType === 'DATE_RANGE' && (!props.modelValue || props.modelValue === '')) {
-			const format = getDateRangeFormat(props.field)
-			const startDate = dayjs().format(format)
-			const endDate = dayjs().add(7, 'day').format(format)
-			return [startDate, endDate]
+			return [dayjs(), dayjs().add(7, 'day')]
 		}
 		
 		// 如果是日期范围类型且值为字符串格式
