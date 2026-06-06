@@ -123,11 +123,11 @@
 		</div>
 
 		<!-- 明细字段专属设置 -->
-		<template v-if="group.type === 'DETAIL'">
+		<template v-if="group.type !== 'MAIN'">
 			<template v-if="hasDetailFields">
 				<a-row :gutter="16">
-					<a-col :span="8">
-						<a-form-item label="值分隔符" name="itemValueSeparator" :label-col="{ span: 8 }">
+					<a-col :span="6">
+						<a-form-item label="值分隔符" name="itemValueSeparator" :label-col="{ span: 10 }">
 							<a-input
 								v-model:value="localConfig.itemValueSeparator"
 								placeholder="如：, 或 ;"
@@ -139,8 +139,21 @@
 							</div>
 						</a-form-item>
 					</a-col>
-					<a-col :span="8">
-						<a-form-item label="行分隔符" name="detailRowSeparator" :label-col="{ span: 8 }">
+					<a-col :span="6">
+						<a-form-item label="行前缀" name="detailRowPrefix" :label-col="{ span: 10 }">
+							<a-input
+								v-model:value="localConfig.detailRowPrefix"
+								placeholder="如：\\x1E"
+								@change="updateQrContent"
+								allow-clear
+							/>
+							<div class="ant-form-item-explain">
+								<small>每行明细前添加的前缀（含首行）</small>
+							</div>
+						</a-form-item>
+					</a-col>
+					<a-col :span="6">
+						<a-form-item label="行分隔符" name="detailRowSeparator" :label-col="{ span: 10 }">
 							<a-input
 								v-model:value="localConfig.detailRowSeparator"
 								placeholder="如：# 或 @"
@@ -148,15 +161,15 @@
 								allow-clear
 							/>
 							<div class="ant-form-item-explain">
-								<small>多条明细数据之间的分隔符</small>
+								<small>多条明细数据之间的行尾连接符</small>
 							</div>
 						</a-form-item>
 					</a-col>
-                    <a-col :span="8">
+                    <a-col :span="6">
                         <a-form-item label="行号" name="detailRowNumber" :label-col="{ span: 8 }">
 						<a-switch v-model:checked="localConfig.detailRowNumber" @change="updateQrContent" />
 						<div class="ant-form-item-explain">
-							<small>每行结尾拼接行号+行分隔符，如：ITEM0011#</small>
+							<small>每行结尾拼接行号+行分隔符</small>
 						</div>
 					</a-form-item>
                     </a-col>
@@ -407,17 +420,19 @@
 				config.previewContent = JSON.stringify(jsonObj, null, 2)
 			}
 		} else if (config.formatType === 'custom') {
-			const separator = p(config.separator) || '|'
+			const separator = (p(config.separator) || '|').trim()
 			const fieldPrefixes = config.fieldPrefixes || {}
 			const hasFieldPrefixes = config.selectedFields.some((fk) => fieldPrefixes[fk])
 
 			let mainContent = ''
 			if (config.detailIncludeMainFields && config.detailLoopMode === 'loop' && hasBothScopeFields.value) {
 				// 携带主字段+循环模式：模拟2行，按selectedFields顺序输出
-				const rowSep = p(config.detailRowSeparator) || '#'
+				const rowSep = (p(config.detailRowSeparator) || '#').trim()
+				const rowPrefix = p(config.detailRowPrefix) || ''
 				const rows = []
 				for (let i = 0; i < 2; i++) {
 					let row = ''
+					if (rowPrefix) row += rowPrefix
 					if (hasFieldPrefixes) {
 						config.selectedFields.forEach((fk) => {
 							const prefix = fieldPrefixes[fk] || ''
