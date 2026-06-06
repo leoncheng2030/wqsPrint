@@ -177,6 +177,7 @@ import { useApiOptimization } from '@/composables/useApiOptimization'
 import { usePerformanceOptimization } from '@/composables/usePerformanceOptimization'
 import pako from 'pako'
 import { getDateFormat, getDateRangeFormat } from '@/utils/dateUtils'
+import { generateQrCodeContent } from '@/utils/qrCodeUtils'
 
 // 默认是关闭状:
 const visible = ref(false)
@@ -1117,7 +1118,7 @@ const handleSinglePageSubmit = async () => {
 					...printData,
 					items: printData.items
 				}
-				printData.qrContent = generateQrCodeContent(validMainQrConfig, allDataForQrCode)
+				printData.qrContent = generateQrCodeContent(validMainQrConfig, allDataForQrCode, formatFieldValue)
 			}
 		}
 
@@ -1135,7 +1136,7 @@ const handleSinglePageSubmit = async () => {
 					printData.items = printData.items.map((item) => {
 						return {
 							...item,
-							qrContent: generateQrCodeContent(validDetailQrConfig, item)
+							qrContent: generateQrCodeContent(validDetailQrConfig, item, formatFieldValue)
 						}
 					})
 
@@ -1196,6 +1197,16 @@ const handleSinglePageSubmit = async () => {
 			printDataList.push(printDataCopy)
 		}
 
+		// 将二维码配置信息存入printData的每一页中，方便编辑时回显
+		printDataList.forEach(pageData => {
+			if (submitData.mainQrCodeConfig) {
+				pageData._mainQrCodeConfig = submitData.mainQrCodeConfig
+			}
+			if (submitData.detailQrCodeConfig) {
+				pageData._detailQrCodeConfig = submitData.detailQrCodeConfig
+			}
+		})
+
 		// 设置打印数据（始终存储为数组格式，保持数据结构一致性）
 		submitData.printData = JSON.stringify(printDataList)
 
@@ -1203,8 +1214,8 @@ const handleSinglePageSubmit = async () => {
 		delete submitData.businessType
 		delete submitData.dynamicFieldData
 		delete submitData.qrCodeConfig // 删除原有配置信息
-		delete submitData.mainQrCodeConfig // 删除主字段段配置信:
-		delete submitData.detailQrCodeConfig // 删除明细字段段配置信息
+		delete submitData.mainQrCodeConfig // 删除主字段段配置信息（已存入printData）
+		delete submitData.detailQrCodeConfig // 删除明细字段段配置信息（已存入printData）
 
 		await recordApi.recordSubmitForm(submitData, submitData.id)
 
@@ -1312,7 +1323,7 @@ const handleMultiPageSubmit = async () => {
 						}
 						
 						console.log('用于生成主字段二维码的数据:', qrCodeData)
-						printData.qrContent = generateQrCodeContent(validMainQrConfig, qrCodeData)
+						printData.qrContent = generateQrCodeContent(validMainQrConfig, qrCodeData, formatFieldValue)
 						console.log('生成的主字段二维码内容:', printData.qrContent)
 					}
 				}
@@ -1330,7 +1341,7 @@ const handleMultiPageSubmit = async () => {
 							printData.items = printData.items.map((item) => {
 								return {
 									...item,
-									qrContent: generateQrCodeContent(validDetailQrConfig, item)
+									qrContent: generateQrCodeContent(validDetailQrConfig, item, formatFieldValue)
 								}
 							})
 
@@ -1350,15 +1361,25 @@ const handleMultiPageSubmit = async () => {
 			}
 		})
 
-		// 设置多页打印数据（JSON数组格式:
+		// 将二维码配置信息存入printData的每一页中，方便编辑时回显
+		printDataList.forEach(pageData => {
+			if (submitData.mainQrCodeConfig) {
+				pageData._mainQrCodeConfig = submitData.mainQrCodeConfig
+			}
+			if (submitData.detailQrCodeConfig) {
+				pageData._detailQrCodeConfig = submitData.detailQrCodeConfig
+			}
+		})
+		
+		// 设置多页打印数据（JSON数组格式）
 		submitData.printData = JSON.stringify(printDataList)
-
+		
 		// 移除不需要提交的字段段 - 更新删除列表
 		delete submitData.businessType
 		delete submitData.dynamicFieldData
 		delete submitData.qrCodeConfig // 删除原有配置信息
-		delete submitData.mainQrCodeConfig // 删除主字段段配置信:
-		delete submitData.detailQrCodeConfig // 删除明细字段段配置信息
+		delete submitData.mainQrCodeConfig // 删除主字段段配置信息（已存入printData）
+		delete submitData.detailQrCodeConfig // 删除明细字段段配置信息（已存入printData）
 
 
 
@@ -1392,7 +1413,7 @@ const formatFieldValueForSave = (field, value) => {
 			try {
 				const date = dayjs('1899-12-30').add(value, 'day')
 				if (date.isValid()) {
-					const targetFormat = field.dateConfig?.saveFormat || field.dateConfig?.displayFormat || 'YYYY-MM-DD'
+					const targetFormat = field.dateConfig?.displayFormat || field.dateConfig?.saveFormat || 'YYYY-MM-DD'
 					value = date.format(targetFormat)
 				}
 			} catch (e) {}
@@ -1416,8 +1437,8 @@ const formatFieldValueForSave = (field, value) => {
 
 					// 确定输入格式（优先使用inputFormat，其次displayFormat:
 					const parseFormat = inputFormat || displayFormat
-					// 确定保存格式（默认为YYYY-MM-DD:
-					targetFormat = saveFormat || 'YYYY-MM-DD'
+					// 确定保存格式（优先使用displayFormat，其次saveFormat，默认YYYY-MM-DD）
+					targetFormat = displayFormat || saveFormat || 'YYYY-MM-DD'
 
 					// 如果是点号分隔的格式，先转换为标准格:
 					if (parseFormat && parseFormat.includes('.')) {
@@ -1905,180 +1926,7 @@ const formatFieldValueForDisplay = (field, value) => {
 	return value
 }
 
-// 新增：根据二维码配置和动态字段段数据生成二维码内容
-// const generateQrCodeContent = (qrConfig, dynamicFieldData) => {
-// 	if (!qrConfig || !qrConfig.formatType) {
-// 		return ''
-// 	}
-//
-// 	try {
-// 		let content = ''
-//
-// 		// 将格式类型转换为大写以保证兼容:
-// 		const formatType = qrConfig.formatType.toUpperCase()
-//
-// 		// 根据字段的sortCode重新排序selectedFields，确保生成顺序正确
-// 		let sortedSelectedFields = qrConfig.selectedFields || []
-// 		if (sortedSelectedFields.length > 0 && dynamicFields.value && dynamicFields.value.length > 0) {
-// 			// 创建字段映射表，包含sortCode和fieldScope信息
-// 			const fieldMap = new Map()
-// 			dynamicFields.value.forEach(field => {
-// 				fieldMap.set(field.fieldKey, {
-// 					sortCode: parseInt(field.sortCode) || 0,
-// 					fieldScope: field.fieldScope
-// 				})
-// 			})
-//
-// 			// 按照字段的sortCode和fieldScope重新排序selectedFields
-// 			sortedSelectedFields = [...sortedSelectedFields].sort((a, b) => {
-// 				const fieldA = fieldMap.get(a)
-// 				const fieldB = fieldMap.get(b)
-//
-// 				if (!fieldA || !fieldB) return 0
-//
-// 				// 先按作用域排序（主字段在前）
-// 				if (fieldA.fieldScope !== fieldB.fieldScope) {
-// 					return fieldA.fieldScope === 'MAIN' ? -1 : 1
-// 				}
-//
-// 				// 同作用域内按sortCode排序
-// 				return fieldA.sortCode - fieldB.sortCode
-// 			})
-// 		}
-//
-// 		// 根据格式类型生成内容
-// 		switch (formatType) {
-// 			case 'CUSTOM':
-// 				// 自定义格式：使用分隔符连接选定字段段
-// 				if (sortedSelectedFields.length > 0) {
-// 					// 使用配置中的separator，如果没有则使用默认:'|'
-// 					const separator = qrConfig.separator || qrConfig.customSeparator || '|'
-// 					// 使用明细行分隔符，如果没有配置则使用默认的井号
-// 					const detailRowSeparator = qrConfig.detailRowSeparator || '#'
-//
-// 					// 判断是否有明细字段
-// 					const hasDetailFields = sortedSelectedFields.some(fieldKey =>
-// 						dynamicFieldData.items && dynamicFieldData.items.length > 0 &&
-// 						dynamicFieldData.items[0].hasOwnProperty(fieldKey)
-// 					)
-//
-// 					if (hasDetailFields && dynamicFieldData.items && dynamicFieldData.items.length > 0) {
-// 						// 如果有明细字段，按行循环处理，每行按配置顺序排列字段
-// 						const detailParts = []
-//
-// 						dynamicFieldData.items.forEach((item) => {
-// 							const rowValues = []
-// 							// 按照配置的字段顺序处理每一行
-// 							sortedSelectedFields.forEach((fieldKey) => {
-// 								// 首先检查是否为明细字段（在明细数据中存在且值会变化）
-// 								if (item.hasOwnProperty(fieldKey)) {
-// 									// 明细字段：使用当前行数据
-// 									rowValues.push(formatFieldValue(item[fieldKey], fieldKey))
-// 								} else if (dynamicFieldData[fieldKey] !== undefined) {
-// 									// 主字段：使用主表数据
-// 									rowValues.push(formatFieldValue(dynamicFieldData[fieldKey], fieldKey))
-// 								} else {
-// 									// 字段不存在，添加空值
-// 									rowValues.push('')
-// 								}
-// 							})
-// 							detailParts.push(rowValues.join(separator))
-// 						})
-//
-// 					// 使用明细行分隔符连接各行
-// 					content = detailParts.join(detailRowSeparator)
-// 					console.log('QR Code Content (with details):', content)
-// 					} else {
-// 						// 如果没有明细字段，只处理主字段
-// 						const values = []
-// 						sortedSelectedFields.forEach((fieldKey) => {
-// 							if (dynamicFieldData[fieldKey] !== undefined) {
-// 								values.push(dynamicFieldData[fieldKey] || '')
-// 							}
-// 						})
-// 						content = values.join(separator)
-// 						console.log('QR Code Content (main only):', content)
-// 					}
-// 				}
-// 				break
-//
-// 			case 'JSON':
-// 				// JSON格式：根据数据类型生成不同格:
-// 				if (sortedSelectedFields.length > 0) {
-// 					const jsonData = {}
-// 					sortedSelectedFields.forEach((fieldKey) => {
-// 						if (dynamicFieldData[fieldKey] !== undefined) {
-// 							jsonData[fieldKey] = dynamicFieldData[fieldKey] || ''
-// 						} else if (dynamicFieldData.items && dynamicFieldData.items.length > 0) {
-// 							// 如果是明细字段段，从items中获取所有条目的值并连接
-// 							const itemValues = dynamicFieldData.items.map(item =>
-// 								item[fieldKey] !== undefined ? formatFieldValue(item[fieldKey], fieldKey) : ''
-// 							)
-// 							// 使用配置中的明细值分隔符，如果没有则使用默认:','
-// 							const itemValueSeparator = qrConfig.itemValueSeparator || ','
-// 							// 返回所有明细项的值，用指定分隔符连接
-// 							jsonData[fieldKey] = itemValues.filter(val => val !== '').join(itemValueSeparator)
-// 						} else {
-// 							jsonData[fieldKey] = ''
-// 						}
-// 					})
-//
-// 					// 根据jsonDataType决定输出格式
-// 					if (qrConfig.jsonDataType === 'array') {
-// 						// 数组类型：[{"字段段:1":"字段段:1", "字段段:2":"字段段:2"}]
-// 						content = JSON.stringify([jsonData])
-// 					} else {
-// 						// 对象类型：{"字段段:1":"字段段:1", "字段段:2":"字段段:2"}
-// 						content = JSON.stringify(jsonData)
-// 					}
-// 				}
-// 				break
-//
-// 			case 'URL':
-// 				// URL格式：将选定字段段作为查询参数
-// 				if (sortedSelectedFields.length > 0) {
-// 					const baseUrl = qrConfig.baseUrl || ''
-// 					const params = new URLSearchParams()
-// 					sortedSelectedFields.forEach((fieldKey) => {
-// 						let value = ''
-// 						if (dynamicFieldData[fieldKey] !== undefined) {
-// 							value = dynamicFieldData[fieldKey] || ''
-// 						} else if (dynamicFieldData.items && dynamicFieldData.items.length > 0) {
-// 							// 如果是明细字段段，从items中获取所有条目的值并连接
-// 							const itemValues = dynamicFieldData.items.map(item =>
-// 								item[fieldKey] !== undefined ? formatFieldValue(item[fieldKey], fieldKey) : ''
-// 							)
-// 							// 使用配置中的明细值分隔符，如果没有则使用默认:','
-// 							const itemValueSeparator = qrConfig.itemValueSeparator || ','
-// 							// 返回所有明细项的值，用指定分隔符连接
-// 							value = itemValues.filter(val => val !== '').join(itemValueSeparator)
-// 						}
-// 						if (value) {
-// 							params.append(fieldKey, value)
-// 						}
-// 					})
-// 					content = baseUrl + (params.toString() ? '?' + params.toString() : '')
-// 				}
-// 				break
-//
-// 			default:
-// 				break
-// 		}
-//
-// 		// 在内容最后添加结束标识符（如果配置了的话）
-// 		if (qrConfig.endMarker && qrConfig.endMarker.trim() !== '') {
-// 			if (content && content.trim() !== '') {
-// 				content = content + qrConfig.endMarker
-// 			} else {
-// 				content = qrConfig.endMarker
-// 			}
-// 		}
-//
-// 		return content
-// 	} catch (error) {
-// 		return ''
-// 	}
-// }
+
 
 // 根据字段配置格式化字段值（如数字小数位数）
 const formatFieldValue = (value, fieldKey) => {
@@ -2103,249 +1951,6 @@ const formatFieldValue = (value, fieldKey) => {
 	return String(value ?? '')
 }
 
-// 根据二维码配置和动态字段段数据生成二维码内容
-const generateQrCodeContent = (qrConfig, dynamicFieldData) => {
-	if (!qrConfig || !qrConfig.formatType) {
-		return ''
-	}
-
-	// 转换控制字符：将 \\x1E(RS) 、\\x1D(GS) 、\\x04(EOT) 等文本转换为实际字节
-	const parseCtrl = (str) => {
-		if (!str) return str
-		return str
-			.replace(/\\x1E/g, String.fromCharCode(30))
-			.replace(/\\x1D/g, String.fromCharCode(29))
-			.replace(/\\x04/g, String.fromCharCode(4))
-			.replace(/\\x1F/g, String.fromCharCode(31))
-	}
-	qrConfig.separator = parseCtrl(qrConfig.separator)
-	qrConfig.startMarker = parseCtrl(qrConfig.startMarker)
-	qrConfig.endMarker = parseCtrl(qrConfig.endMarker)
-	qrConfig.detailRowSeparator = parseCtrl(qrConfig.detailRowSeparator)
-	qrConfig.itemValueSeparator = parseCtrl(qrConfig.itemValueSeparator)
-
-	try {
-		let content = ''
-
-		// 将格式类型转换为大写以保证兼容:
-		const formatType = qrConfig.formatType.toUpperCase()
-
-		// 使用用户配置的字段顺序，而不是根据sortCode重新排序
-		// 原代码中根据sortCode重新排序selectedFields的逻辑是错误的，应保持用户选择的字段顺序
-		const selectedFields = qrConfig.selectedFields || []
-
-		// 根据格式类型生成内容
-		switch (formatType) {
-			case 'CUSTOM':
-				// 自定义格式：使用分隔符连接选定字段段
-				if (selectedFields.length > 0) {
-					// 使用配置中的separator，如果没有则使用默认:'|'
-					const separator = qrConfig.separator || qrConfig.customSeparator || '|'
-					// 使用明细行分隔符，如果没有配置则使用默认的井号
-					const detailRowSeparator = qrConfig.detailRowSeparator || '#'
-					// 获取字段DI前缀映射
-					const fieldPrefixes = qrConfig.fieldPrefixes || {}
-					// 判断是否有配置DI前缀
-					const hasFieldPrefixes = selectedFields.some(fk => fieldPrefixes[fk])
-
-					// 判断是否有明细字段
-					const hasDetailFields = selectedFields.some(fieldKey =>
-						dynamicFieldData.items && dynamicFieldData.items.length > 0 &&
-						dynamicFieldData.items[0].hasOwnProperty(fieldKey)
-					)
-
-					if (hasDetailFields && dynamicFieldData.items && dynamicFieldData.items.length > 0) {
-						const RS = String.fromCharCode(30)
-
-						// 明细行分隔符模式
-						const detailParts = []
-						dynamicFieldData.items.forEach((item) => {
-							const rowValues = []
-							selectedFields.forEach((fieldKey) => {
-								if (item.hasOwnProperty(fieldKey)) {
-									rowValues.push(formatFieldValue(item[fieldKey], fieldKey))
-								} else if (dynamicFieldData[fieldKey] !== undefined) {
-									rowValues.push(formatFieldValue(dynamicFieldData[fieldKey], fieldKey))
-								} else {
-									rowValues.push('')
-								}
-							})
-							if (hasFieldPrefixes) {
-								const diParts = []
-								selectedFields.forEach((fieldKey, i) => {
-									const prefix = fieldPrefixes[fieldKey] || ''
-									diParts.push(separator + prefix + (rowValues[i] || ''))
-								})
-								detailParts.push(diParts.join(''))
-							} else {
-								detailParts.push(rowValues.join(separator))
-							}
-						})
-
-						const formatRowSep = qrConfig.formatId && qrConfig.formatId.trim() !== ''
-							? RS + qrConfig.formatId
-							: null
-						const rowSeparator = formatRowSep || detailRowSeparator
-						content = detailParts.join(rowSeparator)
-						if (formatRowSep && content) {
-							content += RS
-						}
-						console.log('QR Code Content (with details):', content)
-					} else {
-						// 如果没有明细字段，只处理主字段
-						const values = []
-						// 按照用户选择的字段顺序处理
-						selectedFields.forEach((fieldKey) => {
-							if (dynamicFieldData[fieldKey] !== undefined) {
-								values.push(formatFieldValue(dynamicFieldData[fieldKey], fieldKey))
-							}
-						})
-						// 支持DI前缀格式：separator + prefix + value
-						if (hasFieldPrefixes) {
-							const diParts = []
-							selectedFields.forEach((fieldKey, idx) => {
-								const prefix = fieldPrefixes[fieldKey] || ''
-								diParts.push(separator + prefix + (values[idx] || ''))
-							})
-							content = diParts.join('')
-						} else {
-							content = values.join(separator)
-						}
-						console.log('QR Code Content (main only):', content)
-					}
-				}
-				break
-
-			case 'JSON':
-				// JSON格式：根据数据类型生成不同格:
-				if (selectedFields.length > 0) {
-					const jsonData = {}
-					// 按照用户选择的字段顺序处理
-					selectedFields.forEach((fieldKey) => {
-						if (dynamicFieldData[fieldKey] !== undefined) {
-							jsonData[fieldKey] = formatFieldValue(dynamicFieldData[fieldKey], fieldKey)
-						} else if (dynamicFieldData.items && dynamicFieldData.items.length > 0) {
-							// 如果是明细字段段，从items中获取所有条目的值并连接
-							const itemValues = dynamicFieldData.items.map(item =>
-								item[fieldKey] !== undefined ? formatFieldValue(item[fieldKey], fieldKey) : ''
-							)
-							// 使用配置中的明细值分隔符，如果没有则使用默认:','
-							const itemValueSeparator = qrConfig.itemValueSeparator || ','
-							// 返回所有明细项的值，用指定分隔符连接
-							jsonData[fieldKey] = itemValues.filter(val => val !== '').join(itemValueSeparator)
-						} else {
-							jsonData[fieldKey] = ''
-						}
-					})
-
-					// 根据jsonDataType决定输出格式
-					if (qrConfig.jsonDataType === 'array') {
-						// 数组类型：[{"字段段:1":"字段段:1", "字段段:2":"字段段:2"}]
-						content = JSON.stringify([jsonData])
-					} else {
-						// 对象类型：{"字段段:1":"字段段:1", "字段段:2":"字段段:2"}
-						content = JSON.stringify(jsonData)
-					}
-				}
-				break
-
-			case 'URL':
-				// URL格式：将选定字段段作为查询参数
-				if (selectedFields.length > 0) {
-					const baseUrl = qrConfig.baseUrl || ''
-					const params = new URLSearchParams()
-					// 按照用户选择的字段顺序处理
-					selectedFields.forEach((fieldKey) => {
-						let value = ''
-						if (dynamicFieldData[fieldKey] !== undefined) {
-							value = formatFieldValue(dynamicFieldData[fieldKey], fieldKey)
-						} else if (dynamicFieldData.items && dynamicFieldData.items.length > 0) {
-							// 如果是明细字段段，从items中获取所有条目的值并连接
-							const itemValues = dynamicFieldData.items.map(item =>
-								item[fieldKey] !== undefined ? formatFieldValue(item[fieldKey], fieldKey) : ''
-							)
-							// 使用配置中的明细值分隔符，如果没有则使用默认:','
-							const itemValueSeparator = qrConfig.itemValueSeparator || ','
-							// 返回所有明细项的值，用指定分隔符连接
-							value = itemValues.filter(val => val !== '').join(itemValueSeparator)
-						}
-						if (value) {
-							params.append(fieldKey, value)
-						}
-					})
-					content = baseUrl + (params.toString() ? '?' + params.toString() : '')
-				}
-				break
-
-			default:
-				break
-		}
-
-		// 在内容最前添加开始标识符（如果配置了的话）
-		if (qrConfig.startMarker && qrConfig.startMarker.trim() !== '') {
-			let prefix = qrConfig.startMarker
-			// 如果格式标识有值，自动追加 RS + 格式标识（如：[)> + RS + 21）
-			if (qrConfig.formatId && qrConfig.formatId.trim() !== '') {
-				prefix += String.fromCharCode(30) + qrConfig.formatId
-			}
-			if (content && content.trim() !== '') {
-				content = prefix + content
-			} else {
-				content = prefix
-			}
-		}
-
-		// 在内容最后添加结束标识符（如果配置了的话）
-		if (qrConfig.endMarker && qrConfig.endMarker.trim() !== '') {
-			if (content && content.trim() !== '') {
-				content = content + qrConfig.endMarker
-			} else {
-				content = qrConfig.endMarker
-			}
-		}
-
-		// 编码处理：根据encodeMode进行gzip压缩和/或base64编码
-		if (content && qrConfig.encodeMode && qrConfig.encodeMode !== 'none') {
-			let processed = content
-
-			if (qrConfig.encodeMode === 'gzip_base64') {
-				// 完整encodeURI，与旧系统print1.html一致（编码控制符、特殊字符和中文）
-				const softEncode = (s) => encodeURI(s)
-				try {
-					const compressed = pako.gzip(softEncode(processed))
-					let binaryStr = ''
-					const bytes = new Uint8Array(compressed)
-					for (let i = 0; i < bytes.length; i++) {
-						binaryStr += String.fromCharCode(bytes[i])
-					}
-					processed = binaryStr
-				} catch (e) {
-					console.warn('gzip压缩失败:', e)
-				}
-				// 二进制字符串直接btoa
-				try {
-					processed = btoa(processed)
-				} catch (e) {
-					console.warn('base64编码失败:', e)
-				}
-			} else if (qrConfig.encodeMode === 'base64') {
-				// 纯文本通过encodeURIComponent处理非ASCII后再btoa
-				try {
-					processed = btoa(unescape(encodeURIComponent(processed)))
-				} catch (e) {
-					console.warn('base64编码失败:', e)
-				}
-			}
-
-			content = processed
-		}
-
-		return content
-	} catch (error) {
-		return ''
-	}
-}
-
 // convertFormData 方法中的数据回显部分
 const convertFormData = (record) => {
 	const param = {
@@ -2366,23 +1971,38 @@ const convertFormData = (record) => {
 								// 加载该业务类型下的所有模板
 								loadTemplatesByType(templateData.type)
 
-								// 如果有打印数据，从中提取主字段数据
+								// 如果有打印数据，从中提取主字段数据和二维码配置
 								let dynamicFieldDataFromPrint = {}
 								if (data.printData) {
 									try {
 										const printData = JSON.parse(data.printData)
-
+								
 										// 判断是否为多页数据（数组格式）
 										let firstPageData = printData
 										if (Array.isArray(printData) && printData.length > 0) {
 											// 如果是数组，取第一页的数据进行回显
 											firstPageData = printData[0]
 										}
-
+								
+										// 从 printData 中提取二维码配置（如果存在）
+										if (firstPageData._mainQrCodeConfig) {
+											formData.value.mainQrCodeConfig = firstPageData._mainQrCodeConfig
+											console.log('从 printData 中回显主字段二维码配置')
+										}
+										if (firstPageData._detailQrCodeConfig) {
+											formData.value.detailQrCodeConfig = firstPageData._detailQrCodeConfig
+											console.log('从 printData 中回显明细字段二维码配置')
+										}
+										// 兼容旧的 qrCodeConfig 字段
+										if (firstPageData._qrCodeConfig && !formData.value.mainQrCodeConfig) {
+											formData.value.qrCodeConfig = firstPageData._qrCodeConfig
+										}
+								
 										// 从printData中提取主字段数据（排除qrContent和items等特殊字段）
 										Object.keys(firstPageData).forEach((key) => {
 											// 排除特殊字段，其余都视为主字段数据
-											if (key !== 'qrContent' && key !== 'items' && key !== '_pageIndex' && key !== '_pageCount') {
+											if (key !== 'qrContent' && key !== 'items' && key !== '_pageIndex' && key !== '_pageCount' &&
+												key !== '_mainQrCodeConfig' && key !== '_detailQrCodeConfig' && key !== '_qrCodeConfig') {
 												dynamicFieldDataFromPrint[key] = firstPageData[key]
 											}
 										})
@@ -2887,12 +2507,27 @@ const processImportedData = (rows) => {
 				if (field) {
 					// 处理特殊字段类型
 					let value = row[j] || ''
-
+				
 					// 处理复选框类型
 					if (field.inputType === 'CHECKBOX') {
 						value = value ? value.split(',').map(v => v.trim()) : []
 					}
-
+				
+					// 处理日期类型：将 Excel 序列号转换为日期字符串
+					if (field.inputType === 'DATE' && typeof value === 'number' && value > 0) {
+						try {
+							const date = dayjs('1899-12-30').add(value, 'day')
+							if (date.isValid()) {
+								// 使用字段的显示格式进行转换
+								const displayFormat = getDateFormat(field)
+								value = date.format(displayFormat)
+								console.log(`Excel日期序列号 ${value} 转换为: ${value}`)
+							}
+						} catch (e) {
+							console.warn('Excel日期转换失败:', e)
+						}
+					}
+				
 					rowData[field.fieldKey] = value
 				}
 			}

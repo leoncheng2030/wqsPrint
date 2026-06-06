@@ -121,7 +121,7 @@
 	import { computed, ref, watch } from 'vue'
 	import { message } from 'ant-design-vue'
 	import dayjs from 'dayjs'
-	import { getDateFormat, getDateRangeFormat, isDateTimeFormat } from '@/utils/dateUtils'
+	import { getDateFormat, getDateRangeFormat, isDateTimeFormat, getNumberPrecision } from '@/utils/dateUtils'
 
 	/**
 	 * 动态字段渲染器组件
@@ -198,21 +198,8 @@
 
 	// 日期格式工具函数已统一移至 dateUtils.js 管理
 
-	// 获取数字精度配置
-	const numberPrecision = computed(() => {
-		if (props.field.inputType !== 'NUMBER' || !props.field.optionsData) return undefined
-		try {
-			const options = typeof props.field.optionsData === 'string'
-				? JSON.parse(props.field.optionsData)
-				: props.field.optionsData
-			if (options.numberConfig && options.numberConfig.precision !== undefined && options.numberConfig.precision >= 0) {
-				return options.numberConfig.precision
-			}
-		} catch (e) {
-			// 解析失败，返回 undefined
-		}
-		return undefined
-	})
+	// 获取数字精度配置 - 由 dateUtils 统一管理
+	const numberPrecision = computed(() => getNumberPrecision(props.field))
 
 	// 计算属性：处理日期范围值的格式转换
 	const dateRangeValue = computed(() => {

@@ -78,15 +78,14 @@ public class LabelDynamicFieldServiceImpl extends ServiceImpl<LabelDynamicFieldM
 
     @Override
     public void add(LabelDynamicFieldAddParam labelDynamicFieldAddParam) {
-        // 检查在同一模板和字段范围内fieldKey是否已存在（排除已逻辑删除的记录）
+        // 检查在同一模板下 fieldKey 是否已存在（全局唯一，不区分主字段/明细字段）
         QueryWrapper<LabelDynamicField> checkWrapper = new QueryWrapper<>();
         checkWrapper.eq("TEMPLATE_ID", labelDynamicFieldAddParam.getTemplateId())
-                   .eq("FIELD_SCOPE", labelDynamicFieldAddParam.getFieldScope())
                    .eq("FIELD_KEY", labelDynamicFieldAddParam.getFieldKey())
-                   .eq("DELETE_FLAG", "NOT_DELETE"); // 排除已逻辑删除的记录，"NOT_DELETE"表示未删除
+                   .eq("DELETE_FLAG", "NOT_DELETE");
         
         if (this.count(checkWrapper) > 0) {
-            throw new RuntimeException("在模板[" + labelDynamicFieldAddParam.getTemplateId() + "]的字段范围[" + labelDynamicFieldAddParam.getFieldScope() + "]中，字段键[" + labelDynamicFieldAddParam.getFieldKey() + "]已存在");
+            throw new RuntimeException("模板[" + labelDynamicFieldAddParam.getTemplateId() + "]中字段键[" + labelDynamicFieldAddParam.getFieldKey() + "]已存在，主字段和明细字段不能重名");
         }
         
         // 如果没有设置排序码，则获取当前最大排序码并加1
@@ -112,16 +111,15 @@ public class LabelDynamicFieldServiceImpl extends ServiceImpl<LabelDynamicFieldM
     public void edit(LabelDynamicFieldEditParam labelDynamicFieldEditParam) {
         LabelDynamicField labelDynamicField = this.queryEntity(labelDynamicFieldEditParam.getId());
         
-        // 检查在同一模板和字段范围内fieldKey是否已存在（排除当前记录和已逻辑删除的记录）
+        // 检查在同一模板下 fieldKey 是否已存在（全局唯一，不区分主字段/明细字段，排除自身）
         QueryWrapper<LabelDynamicField> checkWrapper = new QueryWrapper<>();
         checkWrapper.eq("TEMPLATE_ID", labelDynamicFieldEditParam.getTemplateId())
-                   .eq("FIELD_SCOPE", labelDynamicFieldEditParam.getFieldScope())
                    .eq("FIELD_KEY", labelDynamicFieldEditParam.getFieldKey())
                    .ne("ID", labelDynamicFieldEditParam.getId())
-                   .eq("DELETE_FLAG", "NOT_DELETE"); // 排除已逻辑删除的记录，"NOT_DELETE"表示未删除
+                   .eq("DELETE_FLAG", "NOT_DELETE");
         
         if (this.count(checkWrapper) > 0) {
-            throw new RuntimeException("在模板[" + labelDynamicFieldEditParam.getTemplateId() + "]的字段范围[" + labelDynamicFieldEditParam.getFieldScope() + "]中，字段键[" + labelDynamicFieldEditParam.getFieldKey() + "]已存在");
+            throw new RuntimeException("模板[" + labelDynamicFieldEditParam.getTemplateId() + "]中字段键[" + labelDynamicFieldEditParam.getFieldKey() + "]已存在，主字段和明细字段不能重名");
         }
         
         BeanUtil.copyProperties(labelDynamicFieldEditParam, labelDynamicField);
