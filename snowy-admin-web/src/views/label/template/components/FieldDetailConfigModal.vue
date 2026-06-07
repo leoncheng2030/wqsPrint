@@ -214,6 +214,7 @@
 					separator: '|',
 					itemValueSeparator: ',', // 添加默认的明细字段值分隔符
 					detailRowSeparator: '#', // 添加默认的明细行分隔符
+					detailRowPrefix: '', // 添加默认的行前缀
 					detailRowNumber: false, // 是否启用行号
 					endMarker: '', // 添加默认的结束标识符
 					encodeMode: 'none', // 编码方式：none/base64/gzip_base64
@@ -329,6 +330,7 @@
 				separator: '|',
 				itemValueSeparator: ',',
 				detailRowSeparator: '#',
+				detailRowPrefix: '',
 				detailRowNumber: false,
 				detailIncludeMainFields: false,
 				startMarker: '',
@@ -454,6 +456,7 @@
 					separator: formData.value.qrCodeConfig.separator,
 					itemValueSeparator: formData.value.qrCodeConfig.itemValueSeparator,
 					detailRowSeparator: formData.value.qrCodeConfig.detailRowSeparator,
+					detailRowPrefix: formData.value.qrCodeConfig.detailRowPrefix,
 					detailRowNumber: formData.value.qrCodeConfig.detailRowNumber,
 					detailIncludeMainFields: formData.value.qrCodeConfig.detailIncludeMainFields,
 					startMarker: formData.value.qrCodeConfig.startMarker,

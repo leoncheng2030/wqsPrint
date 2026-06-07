@@ -149,14 +149,14 @@
 			}
 
 			const printData = rendererState.printDataList
-			// 确保打印服务已初始化
-			const status = getPrintStatus()
-
-			if (!status.connected) {
-				const initialized = await initializePrint()
-				if (!initialized) {
-					throw new Error('打印服务初始化失败')
+			// 尝试初始化打印服务（预览不需要客户端连接，失败也可继续）
+			try {
+				const status = getPrintStatus()
+				if (!status.initialized) {
+					await initializePrint()
 				}
+			} catch (e) {
+				console.warn('[Preview] 打印服务初始化失败，但预览仍可继续:', e.message)
 			}
 
 			// 创建模板实例

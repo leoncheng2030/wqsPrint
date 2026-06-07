@@ -32,7 +32,8 @@ window.svPrintHeader = Header
 try {
   const hip = window.hiprint
   if (hip) {
-    // 读取打印服务器 host（优先使用 SNOWY_SYS_BASE_CONFIG 与 WQS_SYS_BASE_CONFIG 的打印服务器地址（优先 SNOWY），并修正日志前缀为 [main]；2) 保持在入口处设置 host 并注册插件；3) 新增统一设置 optionItems（fontSize），以便从 snowy.js 移除兜底初始化。
+    // 读取打印服务器 host（优先使用 SNOWY_SYS_BASE_CONFIG 与 WQS_SYS_BASE_CONFIG），
+    // 存储到全局变量，延迟到实际打印时再设置，避免页面加载时自动连接 WebSocket
     let printHost = null
     try {
       const sysBaseConfigSnowy = tool.data.get('SNOWY_SYS_BASE_CONFIG')
@@ -50,18 +51,10 @@ try {
       printHost = config.SYS_BASE_CONFIG.SNOWY_SYS_PRINT_HOST
     }
 
-    // 在注册前设置 host，确保 hiwebSocket 使用正确的地址
-    if (typeof hip.setConfig === 'function' && printHost) {
-      try {
-        console.log('[main] 打印服务器 host:', printHost)
-        hip.setConfig({ host: printHost })
-        console.log('[main] ✅ 通过 hiprint.setConfig 设置 host 成功:', printHost)
-      } catch (setConfigError) {
-        console.warn('[main] ⚠️ hiprint.setConfig 设置 host 失败:', setConfigError)
-      }
-    }
+    // 存储打印服务器 host 到全局，供 printManager 在需要时设置
+    window.__hiprintHost = printHost
 
-    // 统一注册 hiprint 插件
+    // 统一注册 hiprint 插件（不传 host，避免 hiwebSocket 页面加载时自动连接）
     const plugins = [
       e2Table({}),
       echarts({}),
@@ -71,9 +64,7 @@ try {
     ]
     hip.register({
       authKey: config.authKey,
-      plugins,
-      // 保持入口处统一设置打印服务器 host
-      host: printHost
+      plugins
     })
 
     // 统一设置可选项（如字体大小）

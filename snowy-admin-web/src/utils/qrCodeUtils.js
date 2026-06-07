@@ -32,6 +32,7 @@ export const generateQrCodeContent = (qrConfig, dynamicFieldData, formatValueFn)
 	qrConfig.startMarker = parseCtrl(qrConfig.startMarker)
 	qrConfig.endMarker = parseCtrl(qrConfig.endMarker)
 	qrConfig.detailRowSeparator = parseCtrl(qrConfig.detailRowSeparator)
+	qrConfig.detailRowPrefix = parseCtrl(qrConfig.detailRowPrefix)
 	qrConfig.itemValueSeparator = parseCtrl(qrConfig.itemValueSeparator)
 
 	// formatId 前导分隔符，默认 RS(\x1E)。修复问题3/4：不再硬编码 RS
@@ -119,18 +120,26 @@ export const generateQrCodeContent = (qrConfig, dynamicFieldData, formatValueFn)
 							content = hasFieldPrefixes ? buildDiParts(selectedFields, values) : buildSimpleParts(selectedFields, values)
 						}
 					} else if (detailLoopMode === 'loop') {
-						// 循环模式：每条明细以 RS21 为前缀（格式标识），
-						// 符合 GS1-128 标准：每行都有独立的格式标识
-						// 注意：第一个 item 的 RS21 由全局 startMarker+formatId 提供，所以跳过
+						// 循环模式：每条明细以 detailRowPrefix +格式标识 为前缀
 						if (dynamicFieldData.items && dynamicFieldData.items.length > 0) {
 							const rowFormatIdPrefix = buildRowFormatIdPrefix()
-							const itemBlocks = dynamicFieldData.items.map((item, idx) =>
-								(idx === 0 ? '' : rowFormatIdPrefix) + buildItemRow(item)
-							)
+							const rowPrefix = qrConfig.detailRowPrefix || ''
+							const useRowNumber = qrConfig.detailRowNumber
+							const rowSep = qrConfig.detailRowSeparator || '#'
+							const itemBlocks = dynamicFieldData.items.map((item, idx) => {
+								let block = ''
+								// 行前缀
+								if (rowPrefix) block += rowPrefix
+								// 格式标识前缀（如 RS21，第一个 item 不加，由 startMarker 提供）
+								if (idx > 0) block += rowFormatIdPrefix
+								// 行数据
+								block += buildItemRow(item)
+								// 每行末尾加行分隔符 + 行号
+								block += rowSep
+								if (useRowNumber) block += (idx + 1)
+								return block
+							})
 							content = itemBlocks.join('')
-							if (formatRowSep && content) {
-								content += RS
-							}
 						} else if (dynamicFieldData[selectedFields[0]] !== undefined) {
 							const values = selectedFields.map(fk => fmtVal(dynamicFieldData[fk], fk))
 							content = hasFieldPrefixes ? buildDiParts(selectedFields, values) : buildSimpleParts(selectedFields, values)
@@ -244,7 +253,7 @@ export const generateQrCodeContent = (qrConfig, dynamicFieldData, formatValueFn)
 			let processed = content
 
 			if (qrConfig.encodeMode === 'gzip_base64') {
-				const softEncode = (s) => encodeURI(s)
+				const softEncode = (s) => encodeURI(s).replace(/%[A-F0-9]{2}/g, (m) => m.toLowerCase())
 				try {
 					const compressed = pako.gzip(softEncode(processed))
 					let binaryStr = ''
@@ -263,7 +272,7 @@ export const generateQrCodeContent = (qrConfig, dynamicFieldData, formatValueFn)
 				}
 			} else if (qrConfig.encodeMode === 'base64') {
 				try {
-					processed = btoa(unescape(encodeURIComponent(processed)))
+					processed = btoa(unescape(encodeURIComponent(processed).replace(/%[A-F0-9]{2}/g, (m) => m.toLowerCase())))
 				} catch (e) {
 					console.warn('base64编码失败:', e)
 				}

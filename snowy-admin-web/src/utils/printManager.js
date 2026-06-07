@@ -56,6 +56,17 @@ class PrintManager {
 			this.hiprint = window.hiprint
 			console.log('[PrintManager] hiprint 对象已设置')
 
+			// 设置打印服务器 host（从 main.js 读取存储的值，仅在需要时连接）
+			try {
+				const printHost = window.__hiprintHost
+				if (printHost && typeof this.hiprint.setConfig === 'function') {
+					this.hiprint.setConfig({ host: printHost })
+					console.log('[PrintManager] 设置打印服务器 host:', printHost)
+				}
+			} catch (hostError) {
+				console.warn('[PrintManager] 设置打印服务器 host 失败:', hostError)
+			}
+
 			// 检查 hiwebSocket
 			console.log('[PrintManager] 检查 window.hiwebSocket:', window.hiwebSocket)
 			if (window.hiwebSocket) {

@@ -1933,6 +1933,38 @@ const formatFieldValue = (value, fieldKey) => {
 	if (value === undefined || value === null) return ''
 	// 查找字段配置
 	const field = dynamicFields.value.find(f => f.fieldKey === fieldKey)
+	// 先处理补零配置（前补零/后补零），独立于 optionsData 解析
+	if (field && field.inputConfig) {
+		const inputCfg = field.inputConfig
+		if (inputCfg.enablePadding) {
+			const { totalLength, paddingDirection, paddingChar } = inputCfg
+			if (totalLength && totalLength > 0) {
+				const stringValue = String(value ?? '')
+				const padCharacter = paddingChar || '0'
+				if (paddingDirection === 'suffix' || paddingDirection === 'right') {
+					return stringValue.padEnd(totalLength, padCharacter)
+				} else {
+					return stringValue.padStart(totalLength, padCharacter)
+				}
+			}
+		}
+		// 支持旧的 padZero 配置格式
+		else if (inputCfg.padZero) {
+			const { padLength, padDirection, padChar } = inputCfg
+			if (padLength && padLength > 0) {
+				const stringValue = String(value ?? '')
+				const paddingChar = padChar || '0'
+				if (stringValue.length < padLength) {
+					if (padDirection === 'suffix' || padDirection === 'right') {
+						return stringValue.padEnd(padLength, paddingChar)
+					} else {
+						return stringValue.padStart(padLength, paddingChar)
+					}
+				}
+			}
+		}
+	}
+	// 处理 optionsData 中的配置（numberConfig 精度等）
 	if (field && field.optionsData) {
 		try {
 			const options = typeof field.optionsData === 'string'

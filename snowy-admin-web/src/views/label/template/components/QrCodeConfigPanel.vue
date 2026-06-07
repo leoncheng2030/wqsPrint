@@ -442,7 +442,7 @@
 						row = config.selectedFields.join(separator)
 					}
 					if (config.detailRowNumber) {
-						row += (i + 1) + rowSep
+						row += rowSep + (i + 1)
 					} else {
 						row += rowSep
 					}
@@ -484,7 +484,7 @@
 			let processed = config.previewContent
 
 			if (config.encodeMode === 'gzip_base64') {
-				const softEncode = (s) => encodeURI(s)
+				const softEncode = (s) => encodeURI(s).replace(/%[A-F0-9]{2}/g, (m) => m.toLowerCase())
 				try {
 					const compressed = pako.gzip(softEncode(processed))
 					let binaryStr = ''
@@ -503,7 +503,7 @@
 				}
 			} else if (config.encodeMode === 'base64') {
 				try {
-					processed = btoa(unescape(encodeURIComponent(processed)))
+					processed = btoa(unescape(encodeURIComponent(processed).replace(/%[A-F0-9]{2}/g, (m) => m.toLowerCase())))
 				} catch (e) {
 					console.warn('base64编码失败:', e)
 				}
