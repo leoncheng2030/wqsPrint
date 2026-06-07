@@ -5,8 +5,8 @@ import { createPinia } from 'pinia'
 import Antd from 'ant-design-vue'
 import 'ant-design-vue/dist/reset.css'
 
-// 引入 sv-print 及其样式文件
-import 'sv-print/dist/style.css'
+// 引入 sv-print 样式文件（由 index.html 直接引入，因 tailwindcss 版本冲突绕过 PostCSS 处理）
+// import 'sv-print/dist/style.css'
 // 导入 hiprint 相关依赖并挂载到全局
 import { hiprint } from '@sv-print/hiprint'
 // 注意：@sv-print/vue3不提供hiprintVue导出，需要直接导入Designer和Header组件
@@ -22,6 +22,10 @@ import { default as fabric } from '@sv-print/plugin-ele-fabric'
 import { default as pdfPlugin } from '@sv-print/plugin-api-pdf3'
 import fontSize from './utils/fontSize'
 import {default as pluginEleBwip} from "@sv-print/plugin-ele-bwip-js"
+import { default as apiExcel } from '@sv-print/plugin-api-excel'
+import { default as eleShtml } from '@sv-print/plugin-ele-shtml'
+import { default as apiImage } from '@sv-print/plugin-api-image'
+import { default as apiPdf } from '@sv-print/plugin-api-pdf'
 // 将 hiprint 挂载到全局 window 对象
 window.hiprint = hiprint
 // 将Designer和Header组件挂载到全局，以便其他地方使用
@@ -60,7 +64,11 @@ try {
       echarts({}),
       fabric({}),
       pdfPlugin({}),
-		 pluginEleBwip({})
+		 pluginEleBwip({}),
+      apiExcel({}),
+      eleShtml({}),
+      apiImage({}),
+      apiPdf({})
     ]
     hip.register({
       authKey: config.authKey,
